@@ -1,0 +1,1 @@
+ALTER TABLE public.participant_responses ADD COLUMN IF NOT EXISTS notes text;
