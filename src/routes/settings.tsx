@@ -155,6 +155,14 @@ function AccountTab({ account }: { account: ReturnType<typeof useCurrentAccount>
       toast.error("New password must be at least 8 characters");
       return;
     }
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email: account.email,
+      password: currentPassword,
+    });
+    if (reauthError) {
+      toast.error("Current password is incorrect");
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       toast.error(error.message);

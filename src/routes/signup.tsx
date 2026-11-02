@@ -90,7 +90,6 @@ function SignUp() {
           email: values.email,
           first_name: values.firstName,
           last_name: values.lastName,
-          email_verified: true,
         });
       } catch {
         /* best-effort */
