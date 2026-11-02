@@ -36,3 +36,6 @@ src/tailwind.config.vibe.json
 .env
 .env.*
 !.env.example
+
+# Local documentation library (not published to GitHub)
+/library/
