@@ -21,7 +21,7 @@ const EVENT_SELECT = `
   *,
   time_slots ( id, date, start_time, end_time ),
   named_participants ( id, first_name, last_name, email, avatar_url ),
-  participant_responses ( id, first_name, last_name, email, slot_ids, notes, avatar_url, submitted_at ),
+  participant_responses ( id, first_name, last_name, email, phone, slot_ids, notes, avatar_url, submitted_at ),
   chat_messages ( id, author_name, author_email, is_organiser, text, pinned, created_at )
 `;
 
@@ -65,8 +65,8 @@ export const getMyProfile = createServerFn({ method: "GET" })
         .insert({
           id: userId,
           email,
-          first_name: "",
-          last_name: "",
+          first_name: String(user?.user?.user_metadata?.["first_name"] ?? "").slice(0, 100),
+          last_name: String(user?.user?.user_metadata?.["last_name"] ?? "").slice(0, 100),
           email_verified: !!user?.user?.email_confirmed_at,
         })
         .select("*")
@@ -279,7 +279,7 @@ export const createMyEvent = createServerFn({ method: "POST" })
             : "Your organiser";
         const origin = await (await import("./klokk-origin.server")).appOrigin();
         for (const p of mapped.namedParticipants) {
-          sendInvitation({
+          await sendInvitation({
             recipientEmail: p.email,
             recipientFirstName: p.firstName,
             recipientLastName: p.lastName,
@@ -322,6 +322,12 @@ export const updateMyEvent = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { data: before } = await supabase
+      .from("events")
+      .select("status")
+      .eq("id", data.id)
+      .eq("owner_id", userId)
+      .maybeSingle();
     const patch: Record<string, unknown> = {};
     if (data.status !== undefined) patch["status"] = data.status;
     if (data.confirmedSlotId !== undefined) patch["confirmed_slot_id"] = data.confirmedSlotId;
@@ -372,7 +378,7 @@ export const updateMyEvent = createServerFn({ method: "POST" })
           : "Your organiser";
       const origin = await (await import("./klokk-origin.server")).appOrigin();
 
-      if (data.status === "confirmed") {
+      if (data.status === "confirmed" && before?.status !== "confirmed") {
         // Casual organisers are invoiced for participants above the 35 included.
         const { invoiceOverage } = await import("./klokk-notify.server");
         await invoiceOverage(event.id);
@@ -387,7 +393,7 @@ export const updateMyEvent = createServerFn({ method: "POST" })
           }
         }
         for (const [email, { first, last }] of recipients) {
-          sendMeetingConfirmation({
+          await sendMeetingConfirmation({
             recipientEmail: email,
             recipientFirstName: first,
             recipientLastName: last,
@@ -396,7 +402,7 @@ export const updateMyEvent = createServerFn({ method: "POST" })
             origin,
           });
         }
-      } else if (data.status === "cancelled") {
+      } else if (data.status === "cancelled" && before?.status !== "cancelled") {
         const recipients = new Map<string, { first: string; last: string }>();
         for (const r of event.responses) {
           recipients.set(r.email.toLowerCase(), { first: r.firstName, last: r.lastName });
@@ -407,7 +413,7 @@ export const updateMyEvent = createServerFn({ method: "POST" })
           }
         }
         for (const [email, { first, last }] of recipients) {
-          sendCancellation({
+          await sendCancellation({
             recipientEmail: email,
             recipientFirstName: first,
             recipientLastName: last,
@@ -517,9 +523,11 @@ export const togglePinFn = createServerFn({ method: "POST" })
 export const deleteMyAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
-    if (error) throw error;
+    // Deleting the sign-in account removes the profile, events, responses, credit packs
+    // and embeds with it (they all cascade from auth.users). Only the server may do this.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(context.userId);
+    if (error) throw new Error("We couldn't delete your account. Please try again or contact us.");
     return { ok: true };
   });
 
@@ -590,7 +598,7 @@ export const sendInvitationsFn = createServerFn({ method: "POST" })
     let sent = 0;
     for (const p of event.namedParticipants) {
       try {
-        sendInvitation({
+        await sendInvitation({
           recipientEmail: p.email,
           recipientFirstName: p.firstName,
           recipientLastName: p.lastName,
@@ -642,7 +650,7 @@ export const sendReminderFn = createServerFn({ method: "POST" })
     let sent = 0;
     for (const p of outstanding) {
       try {
-        sendReminder({
+        await sendReminder({
           recipientEmail: p.email,
           recipientFirstName: p.firstName,
           recipientLastName: p.lastName,

@@ -31,7 +31,7 @@ function Page() {
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">What we collect</h2>
         <p>
-          Organisers: email address, a hashed password and an optional display name. Participants:
+          Organisers: Email address, a hashed password and an optional display name. Participants:
           first name, last name, email address, an optional mobile number, availability selections
           and any notes you choose to add. We do not collect payment card details (payments are
           handled by our payment provider) or any sensitive categories of personal information.
@@ -63,7 +63,7 @@ function Page() {
           regulator as required by law.
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">Contact</h2>
-        <p>Pegasus Apps, Canberra, Australia. Email: info@platinumbusinessteams.com</p>
+        <p>Pegasus Apps, Canberra, Australia.</p>
       </div>
     </div>
   );

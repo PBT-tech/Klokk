@@ -28,6 +28,7 @@ export interface ParticipantResponse {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string | undefined;
   /** slot ids the participant marked available */
   slotIds: string[];
   notes?: string | undefined;

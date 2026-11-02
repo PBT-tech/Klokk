@@ -358,8 +358,8 @@ export function ParticipantResponseView({ token }: { token: string }) {
 
             <p className="text-xs text-muted-foreground">
               By submitting, you agree your name and email will be used to coordinate this meeting
-              and shared with the organiser. They are deleted automatically after the retention
-              period. See our{" "}
+              and shared with the organiser. They are deleted automatically: up to 90 days after the
+              event is created on free plans, or 12 months after it closes on paid plans. See our{" "}
               <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
                 Privacy Policy
               </Link>{" "}

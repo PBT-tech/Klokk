@@ -27,6 +27,7 @@ import { cryptoId, makeToken } from "@/lib/klokk-store";
 import { uploadParticipantAvatar } from "@/lib/klokk-avatars";
 import { useCreateEvent } from "@/lib/klokk-hooks";
 import { toSlotLabel } from "@/lib/klokk-format";
+import { participantCapForPlan } from "@/lib/klokk-limits";
 import type { KlokkAccount, KlokkEvent, NamedParticipant } from "@/lib/klokk-types";
 
 export function CreateEventFlow({ account }: { account: KlokkAccount }) {
@@ -115,7 +116,9 @@ export function CreateEventFlow({ account }: { account: KlokkAccount }) {
       <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-premium sm:p-8">
         {step === 0 && <DetailsStep draft={draft} set={set} />}
         {step === 1 && <SlotsStep draft={draft} set={set} />}
-        {step === 2 && <ParticipantsStep draft={draft} set={set} />}
+        {step === 2 && (
+          <ParticipantsStep draft={draft} set={set} cap={participantCapForPlan(account.plan)} />
+        )}
         {step === 3 && <DeadlineStep draft={draft} set={set} />}
         {step === 4 && <ReviewStep draft={draft} />}
 
@@ -139,7 +142,11 @@ export function CreateEventFlow({ account }: { account: KlokkAccount }) {
               <ArrowRight className="size-4" />
             </Button>
           ) : (
-            <Button onClick={submit} disabled={!canProceed} className="shadow-premium">
+            <Button
+              onClick={submit}
+              disabled={!canProceed || createEvent.isPending}
+              className="shadow-premium"
+            >
               <Check className="size-4" />
               Generate link
             </Button>
@@ -239,9 +246,12 @@ function DetailsStep({
 function ParticipantsStep({
   draft,
   set,
+  cap,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+  /** hard participant cap for the organiser's plan, or null when there is none */
+  cap: number | null;
 }) {
   return (
     <div className="space-y-6">
@@ -272,10 +282,10 @@ function ParticipantsStep({
             id="min"
             type="number"
             min={1}
-            max={draft.participationMode === "minimum" ? 80 : 35}
+            max={cap ?? undefined}
             value={draft.minimumCount}
             onChange={(e) =>
-              set("minimumCount", Math.max(1, Math.min(80, Number(e.target.value) || 1)))
+              set("minimumCount", Math.max(1, Math.min(cap ?? 100000, Number(e.target.value) || 1)))
             }
             className="max-w-xs"
           />
@@ -285,7 +295,7 @@ function ParticipantsStep({
           </p>
         </div>
       ) : (
-        <NamedList draft={draft} set={set} />
+        <NamedList draft={draft} set={set} cap={cap} />
       )}
     </div>
   );
@@ -294,7 +304,9 @@ function ParticipantsStep({
 function NamedList({
   draft,
   set,
+  cap,
 }: {
+  cap: number | null;
   draft: Draft;
   set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
 }) {
@@ -307,9 +319,9 @@ function NamedList({
       toast.error("Fill in name and email");
       return;
     }
-    if (draft.namedParticipants.length >= 80) {
+    if (cap !== null && draft.namedParticipants.length >= cap) {
       toast.error(
-        "Participant limit reached (maximum 80 on Organiser, upgrade to Teams for unlimited)",
+        `Participant limit reached (maximum ${cap} on your plan${cap === 35 ? "; Casual and Organiser allow more" : "; Teams is unlimited"})`,
       );
       return;
     }

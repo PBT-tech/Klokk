@@ -26,9 +26,9 @@ function Page() {
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">The service</h2>
         <p>
-          Klokk helps groups find a meeting time. Organisers create events and share a link;
-          participants submit their availability without an account. Plans, prices and limits are
-          described on our pricing page and may change with notice.
+          Klokk helps groups find a meeting time that works for most. Organisers create events and
+          share a link; participants submit their availability without an account. Plans, prices and
+          limits are described on our pricing page and may change with notice.
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">Acceptable use</h2>
         <p>
@@ -55,7 +55,7 @@ function Page() {
           have under that law.
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">Contact</h2>
-        <p>Pegasus Apps, Canberra, Australia. Email: info@platinumbusinessteams.com</p>
+        <p>Pegasus Apps, Canberra, Australia.</p>
       </div>
     </div>
   );

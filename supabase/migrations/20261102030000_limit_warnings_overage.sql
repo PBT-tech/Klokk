@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS public.limit_warnings (
   -- the zero uuid stands for "not tied to one event"
   event_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
   kind text NOT NULL CHECK (kind IN
-    ('participants_near', 'participants_reached', 'free_events_low', 'credits_low', 'pack_expiring')),
+    ('participants_near', 'participants_reached', 'free_events_low', 'credits_low', 'pack_expiring',
+     'retention_soon')),
   -- a period key lets recurring warnings (e.g. credits low) be sent again after a new purchase
   period text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.overage_invoices (
   participants int NOT NULL,
   blocks int NOT NULL,
   amount numeric(10, 2) NOT NULL,
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'skipped')),
   hl_invoice_id text,
   error text,
   created_at timestamptz NOT NULL DEFAULT now()

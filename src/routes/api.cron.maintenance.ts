@@ -64,9 +64,10 @@ async function run(request: Request): Promise<Response> {
       owner && (owner.first_name || owner.last_name)
         ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
         : "Your organiser";
+    let allSent = true;
     for (const p of event.namedParticipants) {
       if (responded.has(p.email.toLowerCase())) continue;
-      sendReminder({
+      const ok = await sendReminder({
         recipientEmail: p.email,
         recipientFirstName: p.firstName,
         recipientLastName: p.lastName,
@@ -74,12 +75,16 @@ async function run(request: Request): Promise<Response> {
         organiserName,
         origin,
       });
-      summary.reminded++;
+      if (ok) summary.reminded++;
+      else allSent = false;
     }
-    await (db as any)
-      .from("events")
-      .update({ reminder_sent_at: new Date().toISOString() })
-      .eq("id", row.id);
+    // A dropped send is retried on the next run: only mark the event once all went out.
+    if (allSent) {
+      await (db as any)
+        .from("events")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq("id", row.id);
+    }
   }
 
   // 1 & 3. Expiry and retention purge.
@@ -88,6 +93,37 @@ async function run(request: Request): Promise<Response> {
   // Safety net: invoice overage records whose events have finished (or were deleted).
   await (await import("@/lib/klokk-notify.server")).invoicePendingOverages();
   await (db as any).rpc("purge_rate_limits");
+
+  // Free plan: tell organisers 14 days before an event's data is deleted (day 76 of 90).
+  const { data: aging } = await (db as any)
+    .from("events")
+    .select("id, title, owner_id, created_at")
+    .lt("created_at", new Date(Date.now() - 76 * 86_400_000).toISOString())
+    .gt("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString());
+  for (const ev of (aging ?? []) as any[]) {
+    const { data: o } = await (db as any)
+      .from("profiles")
+      .select("plan")
+      .eq("id", ev.owner_id)
+      .maybeSingle();
+    if (o?.plan !== "free") continue;
+    const deleteOn = new Date(new Date(ev.created_at).getTime() + 90 * 86_400_000);
+    const { maybeSendWarning } = await import("@/lib/klokk-notify.server");
+    await maybeSendWarning({
+      userId: ev.owner_id,
+      eventId: ev.id,
+      warning: {
+        kind: "retention_soon",
+        level: "warn",
+        title: `"${ev.title}" will be deleted on ${deleteOn.toLocaleDateString("en-AU")}`,
+        lines: [
+          `Events on the Free plan, with all their responses and participant details, are deleted automatically 90 days after they are created. This cannot be undone.`,
+          `Paid plans keep event data for 12 months after the event closes.`,
+          `Organiser is $17/month for unlimited events, or buy a credit pack from $25.`,
+        ],
+      },
+    });
+  }
 
   // Casual organisers: credits running low or a pack about to expire.
   const { data: casuals } = await (db as any).from("profiles").select("id").eq("plan", "casual");

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +25,43 @@ export const Route = createFileRoute("/reset-password")({
 function ResetPassword() {
   const [sent, setSent] = useState(false);
   const [email, setEmail] = useState("");
+  // True once the emailed link has signed the user in with a recovery session.
+  const [recovering, setRecovering] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+    });
+    // The recovery event can fire before this component mounts: also check the link itself.
+    if (typeof window !== "undefined" && /type=recovery/.test(window.location.hash)) {
+      setRecovering(true);
+    }
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const onSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("The two passwords don't match");
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Password updated — you're signed in");
+    window.location.assign("/dashboard");
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +87,41 @@ function ResetPassword() {
         </Link>
       </div>
       <div className="rounded-2xl border border-border bg-card p-8 shadow-premium">
-        {sent ? (
+        {recovering ? (
+          <>
+            <h1 className="font-display text-2xl font-semibold text-foreground">
+              Choose a new password
+            </h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Use at least 8 characters. You'll be signed in once it's saved.
+            </p>
+            <form className="mt-6 space-y-4" onSubmit={onSetPassword}>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">New password</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Confirm new password
+                </Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={saving}>
+                Save new password
+              </Button>
+            </form>
+          </>
+        ) : sent ? (
           <div className="text-center">
             <div className="mx-auto inline-flex size-14 items-center justify-center rounded-full bg-accent/15 text-accent">
               <MailCheck className="size-6" />

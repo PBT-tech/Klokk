@@ -34,6 +34,7 @@ export function mapResponse(r: any): ParticipantResponse {
     firstName: r.first_name,
     lastName: r.last_name,
     email: r.email,
+    phone: r.phone ?? undefined,
     slotIds: r.slot_ids ?? [],
     notes: r.notes ?? undefined,
     avatarUrl: r.avatar_url ?? undefined,

@@ -133,6 +133,12 @@ function SignUp() {
       /* best-effort */
     }
 
+    if (!data?.session) {
+      // Email confirmation is on: there is no session until the address is verified.
+      toast.success("Account created — check your inbox to verify your email, then sign in.");
+      navigate({ to: "/signin" });
+      return;
+    }
     toast.success("Account created — welcome to Klokk");
     navigate({ to: "/events/new" });
   };
@@ -179,6 +185,10 @@ function SignUp() {
               />
               <PasswordStrength value={passwordValue ?? ""} />
             </Field>
+            <p className="text-xs text-muted-foreground">
+              The free plan includes 3 events. Free-plan events and their responses are deleted
+              automatically 90 days after they are created.
+            </p>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               Create account
               <ArrowRight className="size-4" />

@@ -284,21 +284,25 @@ export const submitResponse = createServerFn({ method: "POST" })
 
     const editToken =
       data.editToken ?? `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
-    const { error } = await client.from("participant_responses").upsert(
-      {
-        event_id: event.id,
-        edit_token_hash: await sha256Hex(editToken),
-        first_name: data.firstName.trim(),
-        last_name: data.lastName.trim(),
-        email,
-        phone: data.phone || null,
-        slot_ids: slotIds,
-        notes: data.notes?.trim() || null,
-        avatar_url: avatarUrl,
-        submitted_at: new Date().toISOString(),
-      },
-      { onConflict: "event_id,email" },
-    );
+    // When someone edits an earlier response, only overwrite phone, notes and photo if they
+    // typed new ones (the edit form does not pre-fill them), so an edit never wipes them.
+    const payload: Record<string, unknown> = {
+      event_id: event.id,
+      edit_token_hash: await sha256Hex(editToken),
+      first_name: data.firstName.trim(),
+      last_name: data.lastName.trim(),
+      email,
+      slot_ids: slotIds,
+      submitted_at: new Date().toISOString(),
+    };
+    const newPhone = data.phone || null;
+    const newNotes = data.notes?.trim() || null;
+    if (!existing || newPhone) payload["phone"] = newPhone;
+    if (!existing || newNotes) payload["notes"] = newNotes;
+    if (!existing || avatarUrl) payload["avatar_url"] = avatarUrl;
+    const { error } = await client
+      .from("participant_responses")
+      .upsert(payload, { onConflict: "event_id,email" });
     if (error) throw error;
 
     await recordEmbedEvent(embedId, "submit");
@@ -343,7 +347,7 @@ export const submitResponse = createServerFn({ method: "POST" })
           chat_messages: [],
           created_at: "",
         });
-        sendSubmissionConfirmation({
+        await sendSubmissionConfirmation({
           recipientEmail: email,
           recipientFirstName: data.firstName,
           recipientLastName: data.lastName,

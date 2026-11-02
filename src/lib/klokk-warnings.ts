@@ -8,7 +8,8 @@ export type WarningKind =
   | "participants_reached"
   | "free_events_low"
   | "credits_low"
-  | "pack_expiring";
+  | "pack_expiring"
+  | "retention_soon";
 
 export interface LimitWarning {
   kind: WarningKind;

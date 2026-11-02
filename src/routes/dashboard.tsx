@@ -88,6 +88,12 @@ function Dashboard() {
         </Link>
       </div>
 
+      {account.plan === "free" && (
+        <p className="mt-6 rounded-xl border border-border bg-surface/60 p-3 text-sm text-muted-foreground">
+          Free plan: each event, with its responses and participant details, is deleted
+          automatically 90 days after it is created. This can't be undone.
+        </p>
+      )}
       {bannerWarning && <LimitBanner warning={bannerWarning} />}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -115,7 +121,7 @@ function Dashboard() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {active.map((c) => (
-              <EventCard key={c.event.id} event={c.event} status={c.status} />
+              <EventCard key={c.event.id} event={c.event} status={c.status} plan={account.plan} />
             ))}
           </div>
         )}
@@ -126,7 +132,7 @@ function Dashboard() {
           <SectionTitle>Confirmed</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {confirmed.map((c) => (
-              <EventCard key={c.event.id} event={c.event} status={c.status} />
+              <EventCard key={c.event.id} event={c.event} status={c.status} plan={account.plan} />
             ))}
           </div>
         </div>
@@ -137,7 +143,7 @@ function Dashboard() {
           <SectionTitle>Closed</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {closed.map((c) => (
-              <EventCard key={c.event.id} event={c.event} status={c.status} />
+              <EventCard key={c.event.id} event={c.event} status={c.status} plan={account.plan} />
             ))}
           </div>
         </div>
@@ -171,9 +177,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function EventCard({
   event,
   status,
+  plan,
 }: {
   event: KlokkEvent;
   status: ReturnType<typeof computeStatus>;
+  plan: string;
 }) {
   const responded = event.responses.length;
   const target =
@@ -181,7 +189,9 @@ function EventCard({
       ? event.namedParticipants.length
       : (event.minimumCount ?? 0);
   const dd = daysUntil(event.deadline);
-  const nearDeletion = status === "confirmed" && event.closedAt && daysUntil(event.closedAt) > 76;
+  // Free-plan events are deleted 90 days after they are created; warn from day 76.
+  const daysLeft = plan === "free" ? 90 + daysUntil(event.createdAt) : null;
+  const nearDeletion = daysLeft !== null && daysLeft <= 14;
 
   return (
     <Link
@@ -225,7 +235,7 @@ function EventCard({
       {nearDeletion && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-destructive">
           <CalendarX className="size-3.5" />
-          Scheduled for deletion in {90 - (daysUntil(event.closedAt!) ?? 0)}d
+          Scheduled for deletion in {Math.max(0, daysLeft ?? 0)} day{daysLeft === 1 ? "" : "s"}
         </p>
       )}
 

@@ -43,6 +43,29 @@ const PLAN_LABEL: Record<string, string> = {
   teams: "Teams",
 };
 
+const ORDER_KEY = "klokk-last-order";
+const rememberOrder = (id: string) => {
+  try {
+    localStorage.setItem(ORDER_KEY, id);
+  } catch {
+    /* storage unavailable */
+  }
+};
+const lastOrder = (): string | undefined => {
+  try {
+    return localStorage.getItem(ORDER_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+const forgetOrder = () => {
+  try {
+    localStorage.removeItem(ORDER_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+};
+
 const PLANS = [
   {
     id: "free",
@@ -98,6 +121,35 @@ export function BillingTab() {
   const billing = useBilling();
   const claim = useClaimOrder();
   const [open, setOpen] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<string | undefined>(() => lastOrder());
+
+  // HighLevel can take a few seconds to make a new order readable, so retry a few times.
+  const claimWithRetry = async (orderId: string) => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await claim.mutateAsync({ orderId });
+        forgetOrder();
+        setPendingOrder(undefined);
+        toast.success("Payment confirmed — your plan has been updated");
+        setOpen(false);
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        const retryable = /could not verify|not been paid|could not be read/i.test(msg);
+        if (!retryable || attempt === 4) {
+          setPendingOrder(orderId);
+          toast.error(
+            retryable
+              ? "Payment received, but we couldn't confirm it yet. Use “Re-check my payment” in a minute."
+              : msg || "We couldn't update your plan.",
+          );
+          setOpen(false);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+      }
+    }
+  };
 
   if (!billing) {
     return <p className="text-sm text-muted-foreground">Loading your plan…</p>;
@@ -230,6 +282,21 @@ export function BillingTab() {
         </p>
       </Card>
 
+      {pendingOrder && (
+        <p className="rounded-xl border border-border bg-surface/60 p-4 text-sm text-foreground">
+          Paid but your plan hasn't updated?{" "}
+          <button
+            type="button"
+            onClick={() => void claimWithRetry(pendingOrder)}
+            className="font-medium text-primary underline underline-offset-4"
+          >
+            Re-check my payment
+          </button>
+          . If it still doesn't update, make sure you paid with the same email address as your Klokk
+          account, or email us.
+        </p>
+      )}
+
       {billing.packs.length > 0 && (
         <Card
           title="Credit packs"
@@ -270,21 +337,8 @@ export function BillingTab() {
               <PaymentCheckoutBlock
                 checkoutMode="all"
                 onSuccess={(order) => {
-                  claim.mutate(
-                    { orderId: order.orderId },
-                    {
-                      onSuccess: () => {
-                        toast.success("Payment confirmed — your plan has been updated");
-                        setOpen(false);
-                      },
-                      onError: (e) =>
-                        toast.error(
-                          e instanceof Error
-                            ? e.message
-                            : "Payment received, but we couldn't update your plan yet. It will update shortly.",
-                        ),
-                    },
-                  );
+                  rememberOrder(order.orderId);
+                  void claimWithRetry(order.orderId);
                 }}
               />
             )}

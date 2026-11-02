@@ -539,6 +539,13 @@ function OpenList({ event }: { event: KlokkEvent }) {
                 {r.firstName} {r.lastName}
               </p>
               <p className="truncate text-xs text-muted-foreground">{r.email}</p>
+              {r.phone && (
+                <p className="truncate text-xs text-muted-foreground">
+                  <a href={`tel:${r.phone.replace(/[^+\d]/g, "")}`} className="hover:underline">
+                    {r.phone}
+                  </a>
+                </p>
+              )}
               {r.notes && (
                 <p className="mt-1 text-xs italic text-accent bg-surface/60 rounded px-2 py-1 border border-border/50">
                   "{r.notes}"
