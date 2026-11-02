@@ -57,9 +57,14 @@ export const getPublicEvent = createServerFn({ method: "GET" })
     return toPublicEvent(row);
   });
 
-/** F4: a participant who re-opens the link with the same email sees their earlier answer. */
+/**
+ * F4: a participant who re-opens the link with the same email sees which times
+ * they chose before. Exact (lowercased) match only, and only slot selections are
+ * returned — never names, notes or avatars — so knowing someone's email does not
+ * reveal anything beyond which slots were ticked.
+ */
 export const lookupMyResponse = createServerFn({ method: "POST" })
-  .validator(z.object({ token: z.string().min(8).max(64), email: z.string().email() }))
+  .validator(z.object({ token: z.string().min(8).max(64), email: z.string().email().max(254) }))
   .handler(async ({ data }) => {
     const client = await admin();
     const { data: event } = await client
@@ -70,18 +75,12 @@ export const lookupMyResponse = createServerFn({ method: "POST" })
     if (!event) return null;
     const { data: row } = await client
       .from("participant_responses")
-      .select("first_name, last_name, slot_ids, notes, avatar_url")
+      .select("slot_ids")
       .eq("event_id", event.id)
-      .ilike("email", data.email.trim())
+      .eq("email", data.email.trim().toLowerCase())
       .maybeSingle();
     if (!row) return null;
-    return {
-      firstName: row.first_name as string,
-      lastName: row.last_name as string,
-      slotIds: (row.slot_ids ?? []) as string[],
-      notes: (row.notes ?? undefined) as string | undefined,
-      avatarUrl: (row.avatar_url ?? undefined) as string | undefined,
-    };
+    return { slotIds: (row.slot_ids ?? []) as string[] };
   });
 
 export const submitResponse = createServerFn({ method: "POST" })
@@ -132,7 +131,7 @@ export const submitResponse = createServerFn({ method: "POST" })
       .from("participant_responses")
       .select("id")
       .eq("event_id", event.id)
-      .ilike("email", email)
+      .eq("email", email)
       .maybeSingle();
     if (cap !== null && !existing) {
       const { count } = await client

@@ -49,14 +49,10 @@ function ParticipantResponse() {
   // F4: pre-fill prior submission by same email.
   const prior = useMyResponse(token, email);
 
-  // Load prior avatar and notes once the prior response is found.
+  // Load the earlier slot selection once the prior response is found.
   useEffect(() => {
     if (!prior) return;
-    if (prior.avatarUrl && !avatarUrl) setAvatarUrl(prior.avatarUrl);
-    if (prior.notes && !notes) setNotes(prior.notes);
     if (selected.size === 0 && prior.slotIds.length > 0) setSelected(new Set(prior.slotIds));
-    if (!firstName) setFirstName(prior.firstName);
-    if (!lastName) setLastName(prior.lastName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prior]);
 

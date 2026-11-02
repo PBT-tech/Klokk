@@ -25,6 +25,14 @@ REVOKE ALL ON public.named_participants FROM anon;
 REVOKE ALL ON public.participant_responses FROM anon;
 REVOKE ALL ON public.chat_messages FROM anon;
 
+-- Normalise participant emails to lowercase (lookups are exact matches). If two
+-- rows for one event differ only by case, keep the most recent submission.
+DELETE FROM public.participant_responses a
+USING public.participant_responses b
+WHERE a.event_id = b.event_id AND lower(a.email) = lower(b.email)
+  AND (a.submitted_at, a.id) < (b.submitted_at, b.id);
+UPDATE public.participant_responses SET email = lower(email) WHERE email <> lower(email);
+
 -- ---------------------------------------------------------------------------
 -- 2. Columns: lifetime event counter and custom confirmed time
 -- ---------------------------------------------------------------------------
