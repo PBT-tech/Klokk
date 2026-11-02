@@ -1,0 +1,375 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Klokk — Emerald Prestige design system.
+ * Deep emerald anchor + warm gold accent on warm cream.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-hero-copy: var(--hero-copy);
+  --color-hero-sub: var(--hero-sub);
+  --color-section-how-bg: var(--section-how-bg);
+  --color-section-why-bg: var(--section-why-bg);
+  --color-section-why-text: var(--section-why-text);
+  --color-section-participants-bg: var(--section-participants-bg);
+  --color-section-participants-text: var(--section-participants-text);
+  --color-section-cases-bg: var(--section-cases-bg);
+  --color-section-eyebrow: var(--section-eyebrow);
+  --color-pricing-subtext: var(--pricing-subtext);
+  --color-how-title: var(--how-title);
+  --color-features-title: var(--features-title);
+  --color-participant-time: var(--participant-time);
+  --color-case-title: var(--case-title);
+  --color-pricing-bg: var(--pricing-bg);
+  --color-pricing-amount: var(--pricing-amount);
+  --color-pricing-bullet: var(--pricing-bullet);
+  --color-casual-block-row: var(--casual-block-row);
+  --color-casual-block-price: var(--casual-block-price);
+  --color-signup-heading: var(--signup-heading);
+  --color-signup-section-bg: var(--signup-section-bg);
+  --color-signup-page-bg: var(--signup-page-bg);
+  --color-hero-best: var(--hero-best);
+  --color-hero-best-border: var(--hero-best-border);
+  --color-hero-best-badge: var(--hero-best-badge);
+  --color-hero-best-bg: var(--hero-best-bg);
+  --color-hero-best-text: var(--hero-best-text);
+  --color-pricing-popular: var(--pricing-popular);
+  --color-popular-badge-bg: var(--popular-badge-bg);
+  --color-popular-badge-text: var(--popular-badge-text);
+  --color-btn-hover-text: var(--btn-hover-text);
+  --color-popular-panel-border: var(--popular-panel-border);
+  --color-organiser-hover-bg: var(--organiser-hover-bg);
+  --color-organiser-hover-text: var(--organiser-hover-text);
+  --color-sms-save-btn-text: var(--sms-save-btn-text);
+  --color-embed-copy-btn-text: var(--embed-copy-btn-text);
+  --color-pw-weak: var(--pw-weak);
+  --color-pw-fair: var(--pw-fair);
+  --color-pw-good: var(--pw-good);
+  --color-pw-strong: var(--pw-strong);
+  --color-main-bg: var(--main-bg);
+  --font-display: "DynaPuff", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Red Hat Display", ui-sans-serif, system-ui, sans-serif;
+  --font-script: "Playwrite VN", ui-serif, Georgia, serif;
+}
+
+:root {
+  --radius: 0.75rem;
+  /* Page shell — light blue in light mode (matches the #eff4f8 the site uses) */
+  --main-bg: oklch(0.9645 0.0044 215.4);
+  /* Background 2 — warm off-white (lightest) */
+  --background: oklch(0.9955 0.0039 115.49);
+  --foreground: oklch(0.2915 0.0611 165.08);
+  /* Accent 2 / card — pale blue */
+  --card: oklch(0.9646 0.0073 244.56);
+  --card-foreground: oklch(0.2915 0.0611 165.08);
+  --popover: oklch(0.9646 0.0073 244.56);
+  --popover-foreground: oklch(0.2915 0.0611 165.08);
+  /* Primary — deep green anchor */
+  --primary: oklch(0.2915 0.0611 165.08);
+  --primary-foreground: oklch(0.98 0.027 173.8);
+  /* Background 1 mid — warm taupe */
+  --secondary: oklch(0.7642 0.0209 64.46);
+  --secondary-foreground: oklch(0.2915 0.0611 165.08);
+  --muted: oklch(0.9543 0.0424 115.4);
+  --muted-foreground: oklch(0.35 0.04 165.08);
+  /* Accent 1 — deep wine red (CTAs / active states) */
+  --accent: oklch(0.4941 0.0933 19.23);
+  --accent-foreground: oklch(0.901 0.0214 13.85);
+  --destructive: oklch(0.2596 0.0836 23.38);
+  --destructive-foreground: oklch(0.901 0.0214 13.85);
+  --border: oklch(0.7642 0.0209 64.46);
+  --input: oklch(0.7642 0.0209 64.46);
+  --ring: oklch(0.4941 0.0933 19.23);
+  /* Brand — primary green scale */
+  --brand: oklch(0.2915 0.0611 165.08);
+  --brand-foreground: oklch(0.98 0.027 173.8);
+  /* Background 1 light — warm cream surface */
+  --surface: oklch(0.9599 0.0045 52.52);
+  --surface-muted: oklch(0.7642 0.0209 64.46);
+  --chart-1: oklch(0.2915 0.0611 165.08);
+  --chart-2: oklch(0.7729 0.1876 155.86);
+  --chart-3: oklch(0.4941 0.0933 19.23);
+  --chart-4: oklch(0.6827 0.0624 239.42);
+  --chart-5: oklch(0.6097 0.0267 62.93);
+  --sidebar: oklch(0.9646 0.0073 244.56);
+  --sidebar-foreground: oklch(0.2915 0.0611 165.08);
+  --sidebar-primary: oklch(0.2915 0.0611 165.08);
+  --sidebar-primary-foreground: oklch(0.98 0.027 173.8);
+  --sidebar-accent: oklch(0.7642 0.0209 64.46);
+  --sidebar-accent-foreground: oklch(0.2915 0.0611 165.08);
+  --sidebar-border: oklch(0.7642 0.0209 64.46);
+  --sidebar-ring: oklch(0.4941 0.0933 19.23);
+  /* Landing section treatments — light mode */
+  --hero-copy: oklch(0.563 0.088 169.6); /* #36866D */
+  --hero-sub: oklch(0.9543 0.0234 142.18); /* #eef4d4 light green */
+  --section-how-bg: oklch(0.9599 0.0027 31.61); /* #f4f1ef warm cream */
+  --section-why-bg: oklch(0.901 0.0206 6.49); /* #ecd9da light pink */
+  --section-why-text: oklch(0.2596 0.078 10.31); /* #440d0f dark wine */
+  --section-participants-bg: oklch(0.9645 0.0044 215.4); /* #eff4f8 light blue */
+  --section-participants-text: oklch(0.2924 0.0242 165.08); /* #003524 deep green body */
+  --section-cases-bg: oklch(0.9954 0.0025 147.67); /* #fdfefb near-white green */
+  --section-eyebrow: oklch(0.4675 0.0515 19.23); /* #8f4a4c muted wine */
+  --pricing-subtext: oklch(0.591 0.0578 64.46); /* #8f8073 warm taupe */
+  --how-title: oklch(0.2915 0.0611 165.08);
+  --features-title: oklch(0.2596 0.078 10.31);
+  --participant-time: oklch(0.2915 0.0611 165.08);
+  --case-title: oklch(0.2915 0.0611 165.08);
+  --pricing-bg: oklch(0.966 0.035 122);
+  --pricing-amount: oklch(0.2915 0.0611 165.08);
+  --pricing-bullet: oklch(0.2915 0.0611 165.08);
+  --casual-block-row: oklch(0.2915 0.0611 165.08);
+  --casual-block-price: oklch(0.2915 0.0611 165.08);
+  --signup-heading: oklch(0.764 0.021 65.1);
+  --signup-section-bg: oklch(0.96 0.004 56.4);
+  --signup-page-bg: oklch(0.9645 0.0044 215.4);
+  --hero-best: oklch(0.4941 0.0933 19.23); /* wine red */
+  --hero-best-border: oklch(0.4941 0.0933 19.23);
+  --hero-best-badge: oklch(0.4941 0.0933 19.23);
+  --hero-best-bg: oklch(0.94 0.015 19.23);
+  --hero-best-text: oklch(0.2915 0.0611 165.08);
+  /* Popular badge + Get Organiser CTA — light mode: wine bg / cream text */
+  --popular-badge-bg: oklch(0.4941 0.0933 19.23);
+  --popular-badge-text: oklch(0.901 0.0214 13.85);
+  --btn-hover-text: oklch(0.2915 0.0611 165.08);
+  --popular-panel-border: oklch(0.4941 0.0933 19.23);
+  --organiser-hover-bg: oklch(0.563 0.088 169.6);
+  --organiser-hover-text: oklch(0.2915 0.0611 165.08);
+  --sms-save-btn-text: oklch(0.563 0.088 169.6);
+  --embed-copy-btn-text: oklch(0.974 0.027 116.1);
+  /* Password strength — light mode */
+  --pw-weak: oklch(0.4941 0.0933 19.23); /* wine red */
+  --pw-fair: oklch(0.68 0.14 56); /* warm amber */
+  --pw-good: oklch(0.563 0.088 169.6); /* #36866D teal-green */
+  --pw-strong: oklch(0.45 0.11 155); /* vivid green */
+}
+
+.dark {
+  /* Background — deep rich forest emerald anchor */
+  --background: oklch(0.18 0.04 165.08);
+  --main-bg: oklch(0.18 0.04 165.08);
+  --foreground: oklch(0.97 0.015 160);
+  /* Card / box — distinct dark elevated slate-emerald surface */
+  --card: oklch(0.24 0.045 165.08);
+  --card-foreground: oklch(0.97 0.015 160);
+  --popover: oklch(0.24 0.045 165.08);
+  --popover-foreground: oklch(0.97 0.015 160);
+  /* Primary — vibrant vivid emerald accent */
+  --primary: oklch(0.72 0.17 155.86);
+  --primary-foreground: oklch(0.18 0.04 165.08);
+  --secondary: oklch(0.28 0.04 165.08);
+  --secondary-foreground: oklch(0.97 0.015 160);
+  --muted: oklch(0.26 0.035 165.08);
+  --muted-foreground: oklch(0.78 0.03 160);
+  /* Accent 1 — deep wine red (CTAs / active states) */
+  --accent: oklch(0.62 0.13 19.23);
+  --accent-foreground: oklch(0.98 0.01 19.23);
+  --destructive: oklch(0.55 0.14 23.38);
+  --destructive-foreground: oklch(0.98 0.01 23.38);
+  --border: oklch(0.32 0.04 165.08);
+  --input: oklch(0.32 0.04 165.08);
+  --ring: oklch(0.72 0.17 155.86);
+  --brand: oklch(0.72 0.17 155.86);
+  --brand-foreground: oklch(0.18 0.04 165.08);
+  --surface: oklch(0.24 0.045 165.08);
+  --surface-muted: oklch(0.3 0.04 165.08);
+  --chart-1: oklch(0.72 0.17 155.86);
+  --chart-2: oklch(0.98 0.027 173.8);
+  --chart-3: oklch(0.62 0.13 19.23);
+  --chart-4: oklch(0.75 0.07 239.42);
+  --chart-5: oklch(0.75 0.035 62.93);
+  --sidebar: oklch(0.22 0.04 165.08);
+  --sidebar-foreground: oklch(0.97 0.015 160);
+  --sidebar-primary: oklch(0.72 0.17 155.86);
+  --sidebar-primary-foreground: oklch(0.18 0.04 165.08);
+  --sidebar-accent: oklch(0.28 0.04 165.08);
+  --sidebar-accent-foreground: oklch(0.97 0.015 160);
+  --sidebar-border: oklch(0.32 0.04 165.08);
+  --sidebar-ring: oklch(0.72 0.17 155.86);
+  /* Landing section treatments — dark mode (keep readable on the deep green base) */
+  --hero-copy: oklch(0.9955 0.0039 115.49);
+  --hero-sub: oklch(0.98 0.027 173.8);
+  --section-how-bg: oklch(0.33 0.05 165.08);
+  --section-why-bg: oklch(0.34 0.05 15);
+  --section-why-text: oklch(0.9955 0.0039 115.49);
+  --section-participants-bg: oklch(0.563 0.088 169.6); /* #36866D (dark) */
+  --section-participants-text: oklch(0.9955 0.0039 115.49);
+  --section-cases-bg: oklch(0.32 0.05 165.08);
+  --section-eyebrow: oklch(0.77 0.06 19.23);
+  --pricing-subtext: oklch(0.8098 0.04 64.46);
+  --how-title: oklch(0.2915 0.0611 165.08); /* deep green — sits on light card */
+  --features-title: oklch(0.61 0.027 63.2); /* warm taupe (dark) */
+  --participant-time: oklch(0.802 0.042 238.2); /* muted blue (dark) */
+  --case-title: oklch(0.683 0.059 238.3); /* muted blue (dark) */
+  --pricing-bg: oklch(0.26 0.084 23.3); /* dark wine (dark) */
+  --pricing-amount: oklch(0.764 0.021 65.1); /* warm taupe (dark) */
+  --pricing-bullet: oklch(0.494 0.093 19.2); /* wine red (dark) */
+  --casual-block-row: oklch(0.802 0.042 238.2); /* muted blue (dark) */
+  --casual-block-price: oklch(0.2915 0.0611 165.08); /* deep green */
+  --signup-heading: oklch(0.26 0.084 23.3);
+  --signup-section-bg: oklch(0.954 0.042 115.8);
+  --signup-page-bg: oklch(0.563 0.088 169.6);
+  --hero-best: oklch(0.494 0.093 19.2); /* wine red OKLCH (49.4% 0.093 19.2) */
+  --hero-best-border: oklch(0.494 0.093 19.2);
+  --hero-best-badge: oklch(0.494 0.093 19.2);
+  --hero-best-bg: oklch(0.494 0.093 19.2 / 0.18);
+  --hero-best-text: oklch(0.61 0.027 63.2); /* warm taupe — best slot card text (dark) */
+  --pricing-popular: oklch(0.683 0.059 238.3); /* muted blue — popular plan emphasis (dark) */
+  /* Popular badge + Get Organiser CTA — dark mode: light green bg / dark wine text */
+  --popular-badge-bg: oklch(0.974 0.027 116.1);
+  --popular-badge-text: oklch(0.26 0.084 23.3);
+  --btn-hover-text: oklch(0.563 0.088 169.6); /* #36866D (dark) */
+  --organiser-hover-text: oklch(
+    0.901 0.021 13.9
+  ); /* light wine — Get Organiser hover text (dark) */
+  --popular-panel-border: oklch(0.802 0.042 238.2);
+  --organiser-hover-bg: oklch(0.563 0.088 169.6);
+  --sms-save-btn-text: oklch(0.563 0.088 169.6);
+  --embed-copy-btn-text: oklch(0.974 0.027 116.1);
+  /* Password strength — dark mode (lifted for the deep green base) */
+  --pw-weak: oklch(0.6 0.12 19);
+  --pw-fair: oklch(0.78 0.13 56);
+  --pw-good: oklch(0.802 0.042 238.2); /* muted blue */
+  --pw-strong: oklch(0.77 0.187 155.86); /* bright green */
+}
+
+@layer base {
+  html {
+    /* Base / minimum font size — 12.5pt (≈16.67px). All rem-based type scales from here. */
+    font-size: 12.5pt;
+    /* Base / minimum font weight — 350. */
+    font-weight: 350;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-script {
+    font-family: var(--font-script);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .shadow-premium {
+    box-shadow:
+      0 1px 2px -1px color-mix(in oklab, var(--brand) 8%, transparent),
+      0 8px 24px -12px color-mix(in oklab, var(--brand) 18%, transparent);
+  }
+  .shadow-glow {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent) 25%, transparent),
+      0 8px 30px -8px color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+}
+
+@keyframes klokk-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: klokk-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes klokk-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.animate-pulse-soft {
+  animation: klokk-pulse-soft 2s ease-in-out infinite;
+}
