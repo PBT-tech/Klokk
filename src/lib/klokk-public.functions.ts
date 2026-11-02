@@ -1,80 +1,156 @@
-// Public participant server functions — NO auth required.
-// Used by the participant response page (no account needed).
-// Uses a publishable client (anon role, public RLS).
+// Public participant server functions — NO login required.
+// Participants are identified only by the event's secret token. These run on
+// the server with the service role and always filter by token, so the database
+// itself exposes nothing to the anon role. Nothing here ever returns another
+// participant's email address or notes.
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { mapEvent } from "./klokk-mapping";
 import { sendSubmissionConfirmation } from "./klokk-email";
-import type { KlokkEvent } from "./klokk-types";
+import { participantCapForPlan } from "./klokk-limits";
+import type { KlokkEvent, ParticipantResponse } from "./klokk-types";
 
-const EVENT_SELECT = `
+const PUBLIC_EVENT_SELECT = `
   *,
   time_slots ( id, date, start_time, end_time ),
-  named_participants ( id, first_name, last_name, email, avatar_url ),
-  participant_responses ( id, first_name, last_name, email, slot_ids, notes, avatar_url, submitted_at ),
-  chat_messages ( id, author_name, author_email, is_organiser, text, pinned, created_at )
+  named_participants ( id, first_name, last_name, avatar_url ),
+  participant_responses ( id, slot_ids, submitted_at )
 `;
 
-function getClient() {
-  const url = process.env["SUPABASE_URL"];
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
-  if (!url || !key) throw new Error("Cloud not configured");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createClient } = require("@supabase/supabase-js");
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+async function admin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+/** Strip anything a participant must not see about other people. */
+function toPublicEvent(row: any): KlokkEvent {
+  const event = mapEvent({ ...row, chat_messages: [] });
+  return {
+    ...event,
+    // Named participants: names only, never emails.
+    namedParticipants: event.namedParticipants.map((p) => ({ ...p, email: "" })),
+    // Responses: slot selections only (used for the availability counts).
+    responses: event.responses.map((r): ParticipantResponse => ({
+      id: r.id,
+      firstName: "",
+      lastName: "",
+      email: "",
+      slotIds: r.slotIds,
+      submittedAt: r.submittedAt,
+    })),
+  };
 }
 
 export const getPublicEvent = createServerFn({ method: "GET" })
-  .validator(z.object({ token: z.string() }))
+  .validator(z.object({ token: z.string().min(8).max(64) }))
   .handler(async ({ data }) => {
-    const client = getClient();
+    const client = await admin();
     const { data: row, error } = await client
       .from("events")
-      .select(EVENT_SELECT)
+      .select(PUBLIC_EVENT_SELECT)
       .eq("token", data.token)
       .maybeSingle();
     if (error) throw error;
     if (!row) return null;
-    return mapEvent(row);
+    return toPublicEvent(row);
+  });
+
+/** F4: a participant who re-opens the link with the same email sees their earlier answer. */
+export const lookupMyResponse = createServerFn({ method: "POST" })
+  .validator(z.object({ token: z.string().min(8).max(64), email: z.string().email() }))
+  .handler(async ({ data }) => {
+    const client = await admin();
+    const { data: event } = await client
+      .from("events")
+      .select("id")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (!event) return null;
+    const { data: row } = await client
+      .from("participant_responses")
+      .select("first_name, last_name, slot_ids, notes, avatar_url")
+      .eq("event_id", event.id)
+      .ilike("email", data.email.trim())
+      .maybeSingle();
+    if (!row) return null;
+    return {
+      firstName: row.first_name as string,
+      lastName: row.last_name as string,
+      slotIds: (row.slot_ids ?? []) as string[],
+      notes: (row.notes ?? undefined) as string | undefined,
+      avatarUrl: (row.avatar_url ?? undefined) as string | undefined,
+    };
   });
 
 export const submitResponse = createServerFn({ method: "POST" })
   .validator(
     z.object({
-      token: z.string(),
-      firstName: z.string().min(1),
-      lastName: z.string().min(1),
-      email: z.string().email(),
-      slotIds: z.array(z.string()).min(1),
-      notes: z.string().optional(),
-      avatarUrl: z.string().optional(),
+      token: z.string().min(8).max(64),
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      email: z.string().email().max(254),
+      slotIds: z.array(z.string()).min(1).max(500),
+      notes: z.string().max(1000).optional(),
+      avatarUrl: z.string().max(2000).optional(),
     }),
   )
   .handler(async ({ data }) => {
-    const client = getClient();
+    const client = await admin();
+    const email = data.email.trim().toLowerCase();
+
     const { data: event, error: evErr } = await client
       .from("events")
       .select(
-        "id, owner_id, status, deadline, title, description, location, token, participation_mode, minimum_count",
+        "id, owner_id, status, deadline, title, description, location, token, participation_mode, minimum_count, time_slots ( id )",
       )
       .eq("token", data.token)
       .maybeSingle();
     if (evErr) throw evErr;
     if (!event) throw new Error("Event not found");
-    if (event.status === "cancelled" || event.status === "closed") {
+    if (event.status === "cancelled" || event.status === "closed" || event.status === "confirmed") {
       throw new Error("This event is closed");
+    }
+    if (new Date(event.deadline).getTime() < Date.now()) {
+      throw new Error("The response deadline for this event has passed");
+    }
+
+    // Only accept slots that belong to this event.
+    const validSlots = new Set(((event as any).time_slots ?? []).map((s: any) => s.id as string));
+    const slotIds = data.slotIds.filter((id) => validSlots.has(id));
+    if (slotIds.length === 0) throw new Error("Select at least one valid time");
+
+    // Server-side participant cap (the database trigger enforces the same rule).
+    const { data: owner } = await client
+      .from("profiles")
+      .select("plan, first_name, last_name")
+      .eq("id", event.owner_id)
+      .maybeSingle();
+    const cap = participantCapForPlan(owner?.plan);
+    const { data: existing } = await client
+      .from("participant_responses")
+      .select("id")
+      .eq("event_id", event.id)
+      .ilike("email", email)
+      .maybeSingle();
+    if (cap !== null && !existing) {
+      const { count } = await client
+        .from("participant_responses")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", event.id);
+      if ((count ?? 0) >= cap) {
+        throw new Error(`This event has reached its participant limit (${cap}).`);
+      }
     }
 
     const { error } = await client.from("participant_responses").upsert(
       {
         event_id: event.id,
-        first_name: data.firstName,
-        last_name: data.lastName,
-        email: data.email,
-        slot_ids: data.slotIds,
+        first_name: data.firstName.trim(),
+        last_name: data.lastName.trim(),
+        email,
+        slot_ids: slotIds,
         notes: data.notes?.trim() || null,
         avatar_url: data.avatarUrl ?? null,
         submitted_at: new Date().toISOString(),
@@ -83,43 +159,27 @@ export const submitResponse = createServerFn({ method: "POST" })
     );
     if (error) throw error;
 
-    // F4/F7: send submission confirmation email to the participant.
+    // F4/F7: submission confirmation email (best-effort, never blocks).
     try {
-      // Fetch organiser name for the email.
-      const { data: owner } = await client
-        .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", event.owner_id)
-        .maybeSingle();
       const organiserName =
         owner && (owner.first_name || owner.last_name)
           ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
           : "Your organiser";
-      const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
-      const fullEvent: KlokkEvent = {
-        id: event.id,
-        token: event.token,
-        ownerId: event.owner_id,
-        title: event.title,
-        description: event.description ?? undefined,
-        location: event.location ?? undefined,
-        slots: [],
-        participationMode: event.participation_mode,
-        minimumCount: event.minimum_count ?? undefined,
-        namedParticipants: [],
-        responses: [],
-        chat: [],
-        status: event.status,
-        deadline: event.deadline,
-        createdAt: "",
-      };
+      const fullEvent: KlokkEvent = mapEvent({
+        ...event,
+        time_slots: [],
+        named_participants: [],
+        participant_responses: [],
+        chat_messages: [],
+        created_at: "",
+      });
       sendSubmissionConfirmation({
-        recipientEmail: data.email,
+        recipientEmail: email,
         recipientFirstName: data.firstName,
         recipientLastName: data.lastName,
         event: fullEvent,
         organiserName,
-        origin,
+        origin: process.env["APP_ORIGIN"] ?? "https://klokk.com",
       });
     } catch {
       /* email is best-effort — never block submission */

@@ -100,9 +100,22 @@ export function SiteFooter() {
             Find a time that works for everyone — fast.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Klokk · Premium meeting co-ordinator
-        </p>
+        <div className="flex flex-col gap-1 sm:items-end">
+          <nav className="flex gap-4 text-xs text-muted-foreground" aria-label="Legal">
+            <Link
+              to="/privacy"
+              className="underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="underline-offset-4 hover:text-foreground hover:underline">
+              Terms of Use
+            </Link>
+          </nav>
+          <p className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} Pegasus Apps · Klokk · Premium meeting co-ordinator
+          </p>
+        </div>
       </div>
     </footer>
   );

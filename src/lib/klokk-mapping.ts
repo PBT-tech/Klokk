@@ -70,6 +70,15 @@ export function mapEvent(row: any): KlokkEvent {
     chat: (row.chat_messages ?? []).map(mapChat),
     status: row.status,
     confirmedSlotId: row.confirmed_slot_id ?? undefined,
+    ...(row.confirmed_custom_date && row.confirmed_custom_start && row.confirmed_custom_end
+      ? {
+          confirmedCustom: {
+            date: row.confirmed_custom_date,
+            startTime: row.confirmed_custom_start,
+            endTime: row.confirmed_custom_end,
+          },
+        }
+      : {}),
     confirmedAt: row.confirmed_at ?? undefined,
     createdAt: row.created_at,
     closedAt: row.closed_at ?? undefined,

@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as EventTokenRouteImport } from './routes/event.$token'
 import { Route as EventsIdRouteImport } from './routes/events.$id'
 import { Route as EventsNewRouteImport } from './routes/events.new'
+import { Route as ApiCronMaintenanceRouteImport } from './routes/api.cron.maintenance'
 import { Route as EventTokenIndexRouteImport } from './routes/event.$token.index'
 import { Route as EventTokenConfirmedRouteImport } from './routes/event.$token.confirmed'
 
@@ -29,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -51,6 +59,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventTokenRoute = EventTokenRouteImport.update({
   id: '/event/$token',
   path: '/event/$token',
@@ -64,6 +77,11 @@ const EventsIdRoute = EventsIdRouteImport.update({
 const EventsNewRoute = EventsNewRouteImport.update({
   id: '/events/new',
   path: '/events/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronMaintenanceRoute = ApiCronMaintenanceRouteImport.update({
+  id: '/api/cron/maintenance',
+  path: '/api/cron/maintenance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventTokenIndexRoute = EventTokenIndexRouteImport.update({
@@ -80,25 +98,31 @@ const EventTokenConfirmedRoute = EventTokenConfirmedRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/event/$token': typeof EventTokenRouteWithChildren
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
+  '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token/': typeof EventTokenIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
+  '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token': typeof EventTokenIndexRoute
 }
@@ -106,13 +130,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/event/$token': typeof EventTokenRouteWithChildren
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
+  '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token/': typeof EventTokenIndexRoute
 }
@@ -121,38 +148,47 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/privacy'
     | '/reset-password'
     | '/settings'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/event/$token'
     | '/events/$id'
     | '/events/new'
+    | '/api/cron/maintenance'
     | '/event/$token/confirmed'
     | '/event/$token/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
+    | '/privacy'
     | '/reset-password'
     | '/settings'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/events/$id'
     | '/events/new'
+    | '/api/cron/maintenance'
     | '/event/$token/confirmed'
     | '/event/$token'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/privacy'
     | '/reset-password'
     | '/settings'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/event/$token'
     | '/events/$id'
     | '/events/new'
+    | '/api/cron/maintenance'
     | '/event/$token/confirmed'
     | '/event/$token/'
   fileRoutesById: FileRoutesById
@@ -160,13 +196,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  TermsRoute: typeof TermsRoute
   EventTokenRoute: typeof EventTokenRouteWithChildren
   EventsIdRoute: typeof EventsIdRoute
   EventsNewRoute: typeof EventsNewRoute
+  ApiCronMaintenanceRoute: typeof ApiCronMaintenanceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -183,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -213,6 +259,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/event/$token': {
       id: '/event/$token'
       path: '/event/$token'
@@ -232,6 +285,13 @@ declare module '@tanstack/react-router' {
       path: '/events/new'
       fullPath: '/events/new'
       preLoaderRoute: typeof EventsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/maintenance': {
+      id: '/api/cron/maintenance'
+      path: '/api/cron/maintenance'
+      fullPath: '/api/cron/maintenance'
+      preLoaderRoute: typeof ApiCronMaintenanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/event/$token/': {
@@ -268,13 +328,16 @@ const EventTokenRouteWithChildren = EventTokenRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  TermsRoute: TermsRoute,
   EventTokenRoute: EventTokenRouteWithChildren,
   EventsIdRoute: EventsIdRoute,
   EventsNewRoute: EventsNewRoute,
+  ApiCronMaintenanceRoute: ApiCronMaintenanceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

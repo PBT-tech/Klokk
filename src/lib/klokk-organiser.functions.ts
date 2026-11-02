@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { mapEvent, mapProfile } from "./klokk-mapping";
 import { makeToken } from "./klokk-store";
+import { participantCapForPlan } from "./klokk-limits";
 import {
   sendMeetingConfirmation,
   sendCancellation,
@@ -171,6 +172,22 @@ export const createMyEvent = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Server-side plan check (the database trigger enforces the same limits).
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("plan, email_verified")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!prof?.email_verified) {
+      throw new Error("Please verify your email address before creating an event.");
+    }
+    const cap = participantCapForPlan(prof.plan);
+    if (cap !== null && data.namedParticipants.length > cap) {
+      throw new Error(`Your plan allows up to ${cap} participants per event.`);
+    }
+    if (cap !== null && data.participationMode === "minimum" && (data.minimumCount ?? 1) > cap) {
+      throw new Error(`Your plan allows up to ${cap} participants per event.`);
+    }
     const token = makeToken();
     const { data: event, error } = await supabase
       .from("events")
@@ -272,6 +289,9 @@ export const updateMyEvent = createServerFn({ method: "POST" })
         ])
         .optional(),
       confirmedSlotId: z.string().nullable().optional(),
+      confirmedCustomDate: z.string().nullable().optional(),
+      confirmedCustomStart: z.string().nullable().optional(),
+      confirmedCustomEnd: z.string().nullable().optional(),
       confirmedAt: z.string().nullable().optional(),
       deadline: z.string().optional(),
       closedAt: z.string().nullable().optional(),
@@ -282,8 +302,29 @@ export const updateMyEvent = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = {};
     if (data.status !== undefined) patch["status"] = data.status;
     if (data.confirmedSlotId !== undefined) patch["confirmed_slot_id"] = data.confirmedSlotId;
+    if (data.confirmedCustomDate !== undefined)
+      patch["confirmed_custom_date"] = data.confirmedCustomDate;
+    if (data.confirmedCustomStart !== undefined)
+      patch["confirmed_custom_start"] = data.confirmedCustomStart;
+    if (data.confirmedCustomEnd !== undefined)
+      patch["confirmed_custom_end"] = data.confirmedCustomEnd;
     if (data.confirmedAt !== undefined) patch["confirmed_at"] = data.confirmedAt;
-    if (data.deadline !== undefined) patch["deadline"] = data.deadline;
+    if (data.deadline !== undefined) {
+      patch["deadline"] = data.deadline;
+      // Extending the deadline of an auto-expired event re-opens it for responses.
+      if (data.status === undefined && new Date(data.deadline).getTime() > Date.now()) {
+        const { data: current } = await supabase
+          .from("events")
+          .select("status")
+          .eq("id", data.id)
+          .eq("owner_id", userId)
+          .maybeSingle();
+        if (current?.status === "expired") {
+          patch["status"] = "awaiting_responses";
+          patch["reminder_sent_at"] = null;
+        }
+      }
+    }
     if (data.closedAt !== undefined) patch["closed_at"] = data.closedAt;
     const { data: row, error } = await supabase
       .from("events")

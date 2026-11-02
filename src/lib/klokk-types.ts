@@ -61,6 +61,8 @@ export interface KlokkEvent {
   chat: ChatMessage[];
   status: EventStatus;
   confirmedSlotId?: string;
+  /** Organiser-entered meeting time that is not one of the proposed slots. */
+  confirmedCustom?: { date: string; startTime: string; endTime: string };
   confirmedAt?: string;
   createdAt: string; // ISO
   closedAt?: string;

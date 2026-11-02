@@ -82,3 +82,17 @@ export function statusLabel(status: string): string {
       return status;
   }
 }
+
+/** Label for the confirmed meeting time (a proposed slot or a custom time), or "" if none. */
+export function confirmedTimeLabel(event: {
+  slots: { id: string; date: string; startTime: string; endTime: string }[];
+  confirmedSlotId?: string | undefined;
+  confirmedCustom?: { date: string; startTime: string; endTime: string } | undefined;
+}): string {
+  if (event.confirmedCustom) {
+    const c = event.confirmedCustom;
+    return toSlotLabel(c.date, c.startTime, c.endTime);
+  }
+  const slot = event.slots.find((s) => s.id === event.confirmedSlotId);
+  return slot ? toSlotLabel(slot.date, slot.startTime, slot.endTime) : "";
+}

@@ -23,7 +23,7 @@ import {
   sendReminderFn,
   sendInvitationsFn,
 } from "./klokk-organiser.functions";
-import { getPublicEvent, submitResponse } from "./klokk-public.functions";
+import { getPublicEvent, lookupMyResponse, submitResponse } from "./klokk-public.functions";
 import type { KlokkAccount, KlokkEvent } from "./klokk-types";
 
 export function useEnsureSeeded() {
@@ -80,6 +80,19 @@ export function useEventByToken(token: string | undefined): KlokkEvent | undefin
     queryKey: ["klokk-public-event", token],
     queryFn: () => fn({ data: { token: token! } }),
     enabled: !!token,
+  });
+  return data ?? undefined;
+}
+
+/** F4: the participant's own earlier answer, looked up by token + email. */
+export function useMyResponse(token: string | undefined, email: string) {
+  const fn = useServerFn(lookupMyResponse);
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const { data } = useQuery({
+    queryKey: ["klokk-my-response", token, email.trim().toLowerCase()],
+    queryFn: () => fn({ data: { token: token!, email: email.trim() } }),
+    enabled: !!token && valid,
+    staleTime: 30_000,
   });
   return data ?? undefined;
 }

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Check, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -8,9 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KlokkLogo } from "@/components/klokk/logo";
 import { AvatarUpload, Avatar } from "@/components/klokk/avatar";
-import { useEventByToken, useSubmitResponse } from "@/lib/klokk-hooks";
+import { useEventByToken, useMyResponse, useSubmitResponse } from "@/lib/klokk-hooks";
 import { computeStatus } from "@/lib/klokk-store";
-import { formatDateTime, relativeDeadline, toSlotLabel } from "@/lib/klokk-format";
+import {
+  confirmedTimeLabel,
+  formatDateTime,
+  relativeDeadline,
+  toSlotLabel,
+} from "@/lib/klokk-format";
 import { uploadParticipantAvatar } from "@/lib/klokk-avatars";
 import { buildTrackingPayload, postTrackingEvent } from "@/lib/klokk-tracking";
 
@@ -42,17 +47,18 @@ function ParticipantResponse() {
   const [submitted, setSubmitted] = useState(false);
 
   // F4: pre-fill prior submission by same email.
-  const prior = useMemo(
-    () => event?.responses.find((r) => r.email.toLowerCase() === email.trim().toLowerCase()),
-    [event, email],
-  );
+  const prior = useMyResponse(token, email);
 
   // Load prior avatar and notes once the prior response is found.
   useEffect(() => {
-    if (prior?.avatarUrl && !avatarUrl) setAvatarUrl(prior.avatarUrl);
-    if (prior?.notes && !notes) setNotes(prior.notes);
+    if (!prior) return;
+    if (prior.avatarUrl && !avatarUrl) setAvatarUrl(prior.avatarUrl);
+    if (prior.notes && !notes) setNotes(prior.notes);
+    if (selected.size === 0 && prior.slotIds.length > 0) setSelected(new Set(prior.slotIds));
+    if (!firstName) setFirstName(prior.firstName);
+    if (!lastName) setLastName(prior.lastName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prior?.avatarUrl, prior?.notes]);
+  }, [prior]);
 
   if (!event) {
     return (
@@ -78,10 +84,10 @@ function ParticipantResponse() {
   const closed =
     status === "cancelled" ||
     status === "closed" ||
-    (status === "confirmed" && !event.confirmedSlotId);
+    (status === "confirmed" && !event.confirmedSlotId && !event.confirmedCustom);
 
-  if (status === "confirmed" && event.confirmedSlotId) {
-    const slot = event.slots.find((s) => s.id === event.confirmedSlotId);
+  if (status === "confirmed" && (event.confirmedSlotId || event.confirmedCustom)) {
+    const label = confirmedTimeLabel(event);
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <div className="mb-6 flex justify-center">
@@ -93,11 +99,7 @@ function ParticipantResponse() {
         <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-foreground">
           This meeting is confirmed
         </h1>
-        {slot && (
-          <p className="mt-3 font-display text-lg text-foreground">
-            {toSlotLabel(slot.date, slot.startTime, slot.endTime)}
-          </p>
-        )}
+        {label && <p className="mt-3 font-display text-lg text-foreground">{label}</p>}
         {event.location && <p className="mt-1 text-sm text-muted-foreground">{event.location}</p>}
         <p className="mt-4 text-sm text-muted-foreground">
           The organiser has locked in a time. Check your inbox for the details.
@@ -151,6 +153,14 @@ function ParticipantResponse() {
         notes: notes.trim() || undefined,
       });
       setSubmitted(true);
+      try {
+        sessionStorage.setItem(
+          `klokk-last-${token}`,
+          JSON.stringify({ firstName: firstName.trim(), slotIds: [...selected] }),
+        );
+      } catch {
+        /* storage unavailable — confirmation page falls back to generic text */
+      }
       toast.success("Availability submitted");
 
       // Fire-and-forget CRM tracking — never blocks the participant flow.
@@ -337,6 +347,20 @@ function ParticipantResponse() {
                 Organisers see any notes alongside your chosen dates and times.
               </p>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              By submitting, you agree your name and email will be used to coordinate this meeting
+              and shared with the organiser. They are deleted automatically after the retention
+              period. See our{" "}
+              <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
+                Privacy Policy
+              </Link>{" "}
+              and{" "}
+              <Link to="/terms" className="underline underline-offset-4 hover:text-foreground">
+                Terms of Use
+              </Link>
+              .
+            </p>
 
             <Button type="submit" className="w-full" size="lg">
               <Check className="size-4" />

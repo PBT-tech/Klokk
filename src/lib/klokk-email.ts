@@ -4,7 +4,7 @@
 //
 // Custom field IDs (registered via the form-tracking integration):
 import type { KlokkEvent } from "./klokk-types";
-import { toSlotLabel } from "./klokk-format";
+import { confirmedTimeLabel } from "./klokk-format";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -160,8 +160,7 @@ export function sendReminder(p: EventPayload) {
 
 /** F6/F7: final meeting confirmation to all participants who responded. */
 export function sendMeetingConfirmation(p: EventPayload) {
-  const slot = p.event.slots.find((s) => s.id === p.event.confirmedSlotId);
-  const confirmedTime = slot ? toSlotLabel(slot.date, slot.startTime, slot.endTime) : "";
+  const confirmedTime = confirmedTimeLabel(p.event);
   postEvent(
     "meeting_confirmation",
     p,

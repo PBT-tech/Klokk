@@ -40,7 +40,16 @@ function SubmissionConfirmed() {
     );
   }
 
-  const myResponse = event.responses[event.responses.length - 1];
+  // Responses from other participants are never sent to this page, so the
+  // participant's own submission is remembered in this browser session.
+  let myResponse: { firstName?: string; slotIds: string[] } | undefined;
+  try {
+    const raw =
+      typeof sessionStorage !== "undefined" ? sessionStorage.getItem(`klokk-last-${token}`) : null;
+    if (raw) myResponse = JSON.parse(raw);
+  } catch {
+    myResponse = undefined;
+  }
   const mySlots = event.slots.filter((s) => myResponse?.slotIds.includes(s.id));
 
   return (
