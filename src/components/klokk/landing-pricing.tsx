@@ -2,6 +2,21 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
 import { SectionHeading } from "./section-heading";
+import { useSession } from "@/lib/klokk-hooks";
+
+/** Paid plan buttons: new visitors sign up first; signed-in users go straight to billing. */
+function PlanCta({ className, children }: { className: string; children: React.ReactNode }) {
+  const session = useSession();
+  return session ? (
+    <a href="/settings?tab=billing" className={className}>
+      {children}
+    </a>
+  ) : (
+    <Link to="/signup" className={className}>
+      {children}
+    </Link>
+  );
+}
 
 export function Pricing() {
   return (
@@ -112,12 +127,9 @@ export function Pricing() {
               </ul>
             </div>
             <div className="mt-6 pt-4 border-t border-border/50">
-              <Link
-                to="/signup"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface hover:text-btn-hover-text"
-              >
+              <PlanCta className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface hover:text-btn-hover-text">
                 Buy a credit pack
-              </Link>
+              </PlanCta>
             </div>
           </div>
 
@@ -164,12 +176,9 @@ export function Pricing() {
               </ul>
             </div>
             <div className="mt-6 pt-4 border-t border-border/50">
-              <Link
-                to="/signup"
-                className="inline-flex w-full items-center justify-center rounded-xl bg-popular-badge-bg py-2 text-sm font-semibold text-popular-badge-text shadow-sm transition-all hover:bg-organiser-hover-bg hover:text-organiser-hover-text"
-              >
+              <PlanCta className="inline-flex w-full items-center justify-center rounded-xl bg-popular-badge-bg py-2 text-sm font-semibold text-popular-badge-text shadow-sm transition-all hover:bg-organiser-hover-bg hover:text-organiser-hover-text">
                 Get Organiser
-              </Link>
+              </PlanCta>
             </div>
           </div>
 
@@ -213,12 +222,9 @@ export function Pricing() {
               </ul>
             </div>
             <div className="mt-6 pt-4 border-t border-border/50">
-              <Link
-                to="/signup"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface hover:text-btn-hover-text"
-              >
+              <PlanCta className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-background py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface hover:text-btn-hover-text">
                 Go with Teams
-              </Link>
+              </PlanCta>
             </div>
           </div>
         </div>

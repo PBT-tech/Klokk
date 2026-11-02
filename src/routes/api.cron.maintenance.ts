@@ -77,6 +77,13 @@ async function run(request: Request): Promise<Response> {
   // 1 & 3. Expiry and retention purge.
   const { data: expired } = await (db as any).rpc("expire_overdue_events");
   const { data: purged } = await (db as any).rpc("purge_expired_events");
+  // Subscriptions that were cancelled (or never renewed) and whose paid period has ended.
+  await (db as any)
+    .from("profiles")
+    .update({ plan: "free", billing_interval: null, billing_status: "active" })
+    .in("plan", ["organiser", "teams"])
+    .eq("billing_status", "cancelled")
+    .lt("plan_renews_at", new Date().toISOString());
   summary.expired = typeof expired === "number" ? expired : 0;
   summary.purged = typeof purged === "number" ? purged : 0;
 

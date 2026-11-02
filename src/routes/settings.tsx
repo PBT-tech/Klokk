@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Bell,
   CreditCard,
+  Globe,
   Mail,
   RefreshCw,
   Shield,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { PaymentCheckoutBlock } from "@/integrations/payments";
 import { AvatarUpload, Avatar } from "@/components/klokk/avatar";
+import { BillingTab, EmbedTab } from "@/components/klokk/settings-panels";
 import {
   useCurrentAccount,
   useSession,
@@ -51,13 +53,17 @@ export const Route = createFileRoute("/settings")({
   component: Settings,
 });
 
-type Tab = "account" | "sms" | "notifications";
+type Tab = "account" | "billing" | "embed" | "notifications";
 
 function Settings() {
   const session = useSession();
   const account = useCurrentAccount();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("account");
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "account";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t === "billing" || t === "embed" || t === "notifications" ? t : "account";
+  });
 
   useEffect(() => {
     if (!session) navigate({ to: "/signin" });
@@ -73,7 +79,8 @@ function Settings() {
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "account", label: "Account", icon: <Shield className="size-4" /> },
-    { id: "sms", label: "SMS credits", icon: <CreditCard className="size-4" /> },
+    { id: "billing", label: "Plan & billing", icon: <CreditCard className="size-4" /> },
+    { id: "embed", label: "Embed", icon: <Globe className="size-4" /> },
     { id: "notifications", label: "Notifications", icon: <Bell className="size-4" /> },
   ];
 
@@ -81,7 +88,7 @@ function Settings() {
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
       <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">Settings</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Manage your account, SMS credits, and notifications.
+        Manage your account, plan and billing, embeds, and notifications.
       </p>
 
       <div className="mt-8 flex flex-wrap gap-1 border-b border-border">
@@ -104,7 +111,8 @@ function Settings() {
 
       <div className="mt-8">
         {tab === "account" && <AccountTab account={account} />}
-        {tab === "sms" && <SmsTab account={account} />}
+        {tab === "billing" && <BillingTab />}
+        {tab === "embed" && <EmbedTab account={account} />}
         {tab === "notifications" && <NotificationsTab account={account} />}
       </div>
     </div>

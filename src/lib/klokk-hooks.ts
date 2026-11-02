@@ -20,9 +20,13 @@ import {
   deleteMyAccount,
   updateNotificationPrefs,
   updateEmbedSettings,
+  listEmbeds,
+  createEmbed,
+  revokeEmbed,
   sendReminderFn,
   sendInvitationsFn,
 } from "./klokk-organiser.functions";
+import { claimOrder, getMyBilling } from "./klokk-billing.functions";
 import { getPublicEvent, lookupMyResponse, submitResponse } from "./klokk-public.functions";
 import type { KlokkAccount, KlokkEvent } from "./klokk-types";
 
@@ -180,6 +184,57 @@ export function useUpdateEmbedSettings() {
   return useMutation({
     mutationFn: (input: any) => fn({ data: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["klokk-profile"] }),
+  });
+}
+
+export function useBilling() {
+  const fn = useServerFn(getMyBilling);
+  const session = useSession();
+  const { data } = useQuery({
+    queryKey: ["klokk-billing"],
+    queryFn: () => fn(),
+    enabled: !!session,
+  });
+  return data ?? undefined;
+}
+
+export function useClaimOrder() {
+  const qc = useQueryClient();
+  const fn = useServerFn(claimOrder);
+  return useMutation({
+    mutationFn: (input: { orderId: string }) => fn({ data: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["klokk-billing"] });
+      qc.invalidateQueries({ queryKey: ["klokk-profile"] });
+    },
+  });
+}
+
+export function useEmbeds(eventId: string | undefined) {
+  const fn = useServerFn(listEmbeds);
+  const { data } = useQuery({
+    queryKey: ["klokk-embeds", eventId],
+    queryFn: () => fn({ data: { eventId: eventId! } }),
+    enabled: !!eventId,
+  });
+  return data ?? [];
+}
+
+export function useCreateEmbed() {
+  const qc = useQueryClient();
+  const fn = useServerFn(createEmbed);
+  return useMutation({
+    mutationFn: (input: { eventId: string; expiresInDays?: number }) => fn({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["klokk-embeds"] }),
+  });
+}
+
+export function useRevokeEmbed() {
+  const qc = useQueryClient();
+  const fn = useServerFn(revokeEmbed);
+  return useMutation({
+    mutationFn: (input: { id: string }) => fn({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["klokk-embeds"] }),
   });
 }
 

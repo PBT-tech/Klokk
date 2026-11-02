@@ -17,10 +17,12 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as EmbedTokenRouteImport } from './routes/embed.$token'
 import { Route as EventTokenRouteImport } from './routes/event.$token'
 import { Route as EventsIdRouteImport } from './routes/events.$id'
 import { Route as EventsNewRouteImport } from './routes/events.new'
 import { Route as ApiCronMaintenanceRouteImport } from './routes/api.cron.maintenance'
+import { Route as ApiWebhooksPaymentsRouteImport } from './routes/api.webhooks.payments'
 import { Route as EventTokenIndexRouteImport } from './routes/event.$token.index'
 import { Route as EventTokenConfirmedRouteImport } from './routes/event.$token.confirmed'
 
@@ -64,6 +66,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmbedTokenRoute = EmbedTokenRouteImport.update({
+  id: '/embed/$token',
+  path: '/embed/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventTokenRoute = EventTokenRouteImport.update({
   id: '/event/$token',
   path: '/event/$token',
@@ -82,6 +89,11 @@ const EventsNewRoute = EventsNewRouteImport.update({
 const ApiCronMaintenanceRoute = ApiCronMaintenanceRouteImport.update({
   id: '/api/cron/maintenance',
   path: '/api/cron/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksPaymentsRoute = ApiWebhooksPaymentsRouteImport.update({
+  id: '/api/webhooks/payments',
+  path: '/api/webhooks/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventTokenIndexRoute = EventTokenIndexRouteImport.update({
@@ -104,10 +116,12 @@ export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/embed/$token': typeof EmbedTokenRoute
   '/event/$token': typeof EventTokenRouteWithChildren
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
   '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
+  '/api/webhooks/payments': typeof ApiWebhooksPaymentsRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token/': typeof EventTokenIndexRoute
 }
@@ -120,9 +134,11 @@ export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/embed/$token': typeof EmbedTokenRoute
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
   '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
+  '/api/webhooks/payments': typeof ApiWebhooksPaymentsRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token': typeof EventTokenIndexRoute
 }
@@ -136,10 +152,12 @@ export interface FileRoutesById {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
+  '/embed/$token': typeof EmbedTokenRoute
   '/event/$token': typeof EventTokenRouteWithChildren
   '/events/$id': typeof EventsIdRoute
   '/events/new': typeof EventsNewRoute
   '/api/cron/maintenance': typeof ApiCronMaintenanceRoute
+  '/api/webhooks/payments': typeof ApiWebhooksPaymentsRoute
   '/event/$token/confirmed': typeof EventTokenConfirmedRoute
   '/event/$token/': typeof EventTokenIndexRoute
 }
@@ -154,10 +172,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/embed/$token'
     | '/event/$token'
     | '/events/$id'
     | '/events/new'
     | '/api/cron/maintenance'
+    | '/api/webhooks/payments'
     | '/event/$token/confirmed'
     | '/event/$token/'
   fileRoutesByTo: FileRoutesByTo
@@ -170,9 +190,11 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/embed/$token'
     | '/events/$id'
     | '/events/new'
     | '/api/cron/maintenance'
+    | '/api/webhooks/payments'
     | '/event/$token/confirmed'
     | '/event/$token'
   id:
@@ -185,10 +207,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/terms'
+    | '/embed/$token'
     | '/event/$token'
     | '/events/$id'
     | '/events/new'
     | '/api/cron/maintenance'
+    | '/api/webhooks/payments'
     | '/event/$token/confirmed'
     | '/event/$token/'
   fileRoutesById: FileRoutesById
@@ -202,10 +226,12 @@ export interface RootRouteChildren {
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
+  EmbedTokenRoute: typeof EmbedTokenRoute
   EventTokenRoute: typeof EventTokenRouteWithChildren
   EventsIdRoute: typeof EventsIdRoute
   EventsNewRoute: typeof EventsNewRoute
   ApiCronMaintenanceRoute: typeof ApiCronMaintenanceRoute
+  ApiWebhooksPaymentsRoute: typeof ApiWebhooksPaymentsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -266,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/embed/$token': {
+      id: '/embed/$token'
+      path: '/embed/$token'
+      fullPath: '/embed/$token'
+      preLoaderRoute: typeof EmbedTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/event/$token': {
       id: '/event/$token'
       path: '/event/$token'
@@ -292,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cron/maintenance'
       fullPath: '/api/cron/maintenance'
       preLoaderRoute: typeof ApiCronMaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/payments': {
+      id: '/api/webhooks/payments'
+      path: '/api/webhooks/payments'
+      fullPath: '/api/webhooks/payments'
+      preLoaderRoute: typeof ApiWebhooksPaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/event/$token/': {
@@ -334,10 +374,12 @@ const rootRouteChildren: RootRouteChildren = {
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,
+  EmbedTokenRoute: EmbedTokenRoute,
   EventTokenRoute: EventTokenRouteWithChildren,
   EventsIdRoute: EventsIdRoute,
   EventsNewRoute: EventsNewRoute,
   ApiCronMaintenanceRoute: ApiCronMaintenanceRoute,
+  ApiWebhooksPaymentsRoute: ApiWebhooksPaymentsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

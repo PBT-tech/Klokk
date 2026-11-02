@@ -512,7 +512,17 @@ export const updateNotificationPrefs = createServerFn({ method: "POST" })
 
 export const updateEmbedSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({ settings: z.any() }))
+  .validator(
+    z.object({
+      settings: z.object({
+        accentOverride: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+        domainAllowlist: z
+          .array(z.string().regex(/^(\*\.)?[a-z0-9.-]+\.[a-z]{2,}(:\d+)?$/))
+          .max(25),
+        embedExpiry: z.string().max(40).optional(),
+      }),
+    }),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase
@@ -620,4 +630,97 @@ export const sendReminderFn = createServerFn({ method: "POST" })
       }
     }
     return { sent };
+  });
+
+// ---------- embed widget (F10) ----------
+
+export interface EmbedLink {
+  id: string;
+  eventId: string;
+  token: string;
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  views: number;
+  interactions: number;
+  submissions: number;
+}
+
+export const listEmbeds = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ eventId: z.string() }))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const db = supabase as any;
+    const { data: rows, error } = await db
+      .from("embed_tokens")
+      .select("id, event_id, created_at, expires_at, revoked_at, events ( token )")
+      .eq("event_id", data.eventId)
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const { signEmbed } = await import("./klokk-embed.server");
+    const out: EmbedLink[] = [];
+    for (const r of rows ?? []) {
+      const { data: ev } = await db.from("embed_events").select("kind").eq("embed_id", r.id);
+      const kinds: string[] = (ev ?? []).map((e: any) => e.kind);
+      out.push({
+        id: r.id,
+        eventId: r.event_id,
+        token: await signEmbed({ e: r.events.token, i: r.id }),
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+        revokedAt: r.revoked_at,
+        views: kinds.filter((k) => k === "view").length,
+        interactions: kinds.filter((k) => k === "interaction").length,
+        submissions: kinds.filter((k) => k === "submit").length,
+      });
+    }
+    return out;
+  });
+
+export const createEmbed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    z.object({
+      eventId: z.string(),
+      /** days until the link stops working; omit to keep it valid until the event is removed */
+      expiresInDays: z.number().int().min(1).max(730).optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const db = supabase as any;
+    const { data: ev } = await db
+      .from("events")
+      .select("id, token")
+      .eq("id", data.eventId)
+      .eq("owner_id", userId)
+      .maybeSingle();
+    if (!ev) throw new Error("Event not found");
+    const expiresAt = data.expiresInDays
+      ? new Date(Date.now() + data.expiresInDays * 86_400_000).toISOString()
+      : null;
+    const { data: row, error } = await db
+      .from("embed_tokens")
+      .insert({ event_id: ev.id, owner_id: userId, expires_at: expiresAt })
+      .select("id")
+      .single();
+    if (error) throw error;
+    const { signEmbed } = await import("./klokk-embed.server");
+    return { id: row.id as string, token: await signEmbed({ e: ev.token, i: row.id }) };
+  });
+
+export const revokeEmbed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await (supabase as any)
+      .from("embed_tokens")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("owner_id", userId);
+    if (error) throw error;
+    return { ok: true };
   });

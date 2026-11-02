@@ -32,9 +32,9 @@ function Page() {
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">What we collect</h2>
         <p>
           Organisers: email address, a hashed password and an optional display name. Participants:
-          first name, last name, email address, availability selections and any notes you choose to
-          add. We do not collect payment card details (payments are handled by our payment provider)
-          or any sensitive categories of personal information.
+          first name, last name, email address, an optional mobile number, availability selections
+          and any notes you choose to add. We do not collect payment card details (payments are
+          handled by our payment provider) or any sensitive categories of personal information.
         </p>
         <h2 className="pt-2 font-display text-lg font-semibold text-foreground">How we use it</h2>
         <p>

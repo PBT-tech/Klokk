@@ -12,6 +12,7 @@ export function SiteHeader() {
   const { signOut } = useAuthActions();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthed = !!session;
+  if (pathname.startsWith("/embed/")) return null;
 
   const handleSignOut = () => {
     signOut();
@@ -91,6 +92,8 @@ function NavLink({
 }
 
 export function SiteFooter() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname.startsWith("/embed/")) return null;
   return (
     <footer className="border-t border-border/70 bg-background">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/klokk/status-badge";
 import { AvailabilityHeatMap, bestSlot } from "@/components/klokk/heat-map";
 import { EventChat } from "@/components/klokk/event-chat";
+import { EmbedPanel } from "@/components/klokk/embed-panel";
 import { Avatar } from "@/components/klokk/avatar";
 import {
   useUpdateEvent,
@@ -30,6 +31,7 @@ import {
   useSendInvitations,
 } from "@/lib/klokk-hooks";
 import { computeStatus } from "@/lib/klokk-store";
+import { CASUAL_INCLUDED_PARTICIPANTS, casualOverage } from "@/lib/klokk-limits";
 import {
   confirmedTimeLabel,
   formatDate,
@@ -54,7 +56,6 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
   const status = computeStatus(event);
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/event/${event.token}`;
   const best = bestSlot(event);
-  const embedCode = `<script src="https://klokk.com/embed.js" data-event="${event.token}" data-accent="${account.embedSettings?.accentOverride ?? "#c9a84c"}"></script>`;
 
   const respondedEmails = useMemo(
     () => new Set(event.responses.map((r) => r.email.toLowerCase())),
@@ -65,15 +66,6 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(link).then(
         () => toast.success("Link copied"),
-        () => toast.error("Couldn't copy"),
-      );
-    }
-  };
-
-  const copyEmbed = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(embedCode).then(
-        () => toast.success("Embed code copied"),
         () => toast.error("Couldn't copy"),
       );
     }
@@ -267,6 +259,17 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
         </div>
       )}
 
+      {account.plan === "casual" && event.responses.length > CASUAL_INCLUDED_PARTICIPANTS && (
+        <p className="mt-6 rounded-xl border border-border bg-surface/60 p-3 text-sm text-foreground">
+          This event has {event.responses.length} participants, over the{" "}
+          {CASUAL_INCLUDED_PARTICIPANTS} included on Casual. Overage for this event:{" "}
+          <strong>${casualOverage(event.responses.length).amount.toFixed(2)}</strong> (
+          {casualOverage(event.responses.length).blocks} block
+          {casualOverage(event.responses.length).blocks === 1 ? "" : "s"} of 5). Organiser
+          ($17/month) has no overage up to 80 participants.
+        </p>
+      )}
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <section>
           <SectionTitle>Availability</SectionTitle>
@@ -387,23 +390,7 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
 
           <section>
             <SectionTitle>Embed</SectionTitle>
-            <div className="rounded-xl border border-border bg-card p-3">
-              <p className="mb-3 text-xs text-muted-foreground">
-                Drop the Klokk scheduler onto any external page for this event.
-              </p>
-              <pre className="overflow-x-auto rounded-lg border border-border bg-surface/60 p-3 text-[10px] leading-relaxed text-foreground">
-                <code>{embedCode}</code>
-              </pre>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyEmbed}
-                className="mt-3 w-full text-embed-copy-btn-text"
-              >
-                <Copy className="size-3.5" />
-                Copy snippet
-              </Button>
-            </div>
+            <EmbedPanel event={event} account={account} />
           </section>
 
           <section>

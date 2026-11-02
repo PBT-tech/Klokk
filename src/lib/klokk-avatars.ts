@@ -3,6 +3,7 @@
 // and participants (anon, on the public response path).
 
 import { supabase } from "@/integrations/supabase/client";
+import { uploadParticipantAvatarFn } from "./klokk-public.functions";
 
 const BUCKET = "avatars";
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -32,22 +33,19 @@ export async function uploadOrganiserAvatar(userId: string, file: File): Promise
 }
 
 /**
- * Upload an avatar for an anonymous participant responding to an event.
- * Uses a random id so each submission is unique; the public `avatars`
- * bucket allows anon inserts via the storage.objects policy.
+ * Upload an avatar for a participant responding to an event. Goes through a
+ * server function (no anonymous storage access), which verifies the event link,
+ * file type and size.
  */
 export async function uploadParticipantAvatar(token: string, file: File): Promise<string> {
-  if (!isAllowedAvatarFile(file)) {
-    throw new Error("Image must be 5 MB or smaller");
+  if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+    throw new Error("Image must be 2 MB or smaller");
   }
-  const ext = file.name.split(".").pop() ?? "png";
-  const path = `participants/${token}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    cacheControl: "3600",
-    upsert: true,
-    contentType: file.type || "image/png",
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let bin = "";
+  for (const b of buf) bin += String.fromCharCode(b);
+  const { url } = await uploadParticipantAvatarFn({
+    data: { token, contentType: file.type, dataBase64: btoa(bin) },
   });
-  if (error) throw error;
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return url;
 }
