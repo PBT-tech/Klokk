@@ -12,17 +12,36 @@ export type PriceGrant =
   | { kind: "seat" };
 
 /**
- * BILLING_PRICE_MAP is a JSON object keyed by HighLevel price id, e.g.
+ * Maps HighLevel price ids to what they grant. BILLING_PRICE_MAP (JSON) can add to or override the defaults, e.g.
  * {"6a1...": {"kind":"pack","events":5}, "6a2...": {"kind":"subscription","plan":"organiser","interval":"month"}}
  */
 export function priceMap(): Record<string, PriceGrant> {
   try {
     const raw = process.env["BILLING_PRICE_MAP"];
-    return raw ? (JSON.parse(raw) as Record<string, PriceGrant>) : {};
+    return {
+      ...DEFAULT_PRICE_MAP,
+      ...(raw ? (JSON.parse(raw) as Record<string, PriceGrant>) : {}),
+    };
   } catch {
-    return {};
+    return { ...DEFAULT_PRICE_MAP };
   }
 }
+
+/**
+ * The prices created in the Klokk HighLevel sub-account (AUD). Price ids are not secret.
+ * Override or extend with BILLING_PRICE_MAP if prices are ever recreated.
+ */
+export const DEFAULT_PRICE_MAP: Record<string, PriceGrant> = {
+  "6ae8727190f5beded44a566b": { kind: "pack", events: 5 },
+  "6ae8727268a0b355ae0df038": { kind: "pack", events: 10 },
+  "6ae8727366931dd9e8cf8bcd": { kind: "pack", events: 15 },
+  "6ae87274de7d7c061ecece9e": { kind: "subscription", plan: "organiser", interval: "month" },
+  "6ae8727697cd4e35cc5f21e4": { kind: "subscription", plan: "organiser", interval: "year" },
+  "6ae87277965bf50b283f97a1": { kind: "subscription", plan: "teams", interval: "month" },
+  "6ae872787d1cf14640e41a3d": { kind: "subscription", plan: "teams", interval: "year" },
+  "6ae87279a04ac34e64b92013": { kind: "seat" },
+  "6ae8727a965bf50b283f97d3": { kind: "seat" },
+};
 
 async function admin(): Promise<any> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

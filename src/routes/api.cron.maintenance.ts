@@ -10,6 +10,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { mapEvent } from "@/lib/klokk-mapping";
 import { sendReminder } from "@/lib/klokk-email";
+import { eventsWarning } from "@/lib/klokk-warnings";
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -77,6 +78,31 @@ async function run(request: Request): Promise<Response> {
   // 1 & 3. Expiry and retention purge.
   const { data: expired } = await (db as any).rpc("expire_overdue_events");
   const { data: purged } = await (db as any).rpc("purge_expired_events");
+  // Casual organisers: credits running low or a pack about to expire.
+  const { data: casuals } = await (db as any).from("profiles").select("id").eq("plan", "casual");
+  for (const c of (casuals ?? []) as { id: string }[]) {
+    const { data: packs } = await (db as any)
+      .from("event_credit_packs")
+      .select("events_total, events_used, expires_at")
+      .eq("user_id", c.id);
+    const live = ((packs ?? []) as any[])
+      .filter(
+        (k) => k.events_used < k.events_total && new Date(k.expires_at).getTime() > Date.now(),
+      )
+      .sort((a, b) => a.expires_at.localeCompare(b.expires_at));
+    const warning = eventsWarning({
+      plan: "casual",
+      eventsCreated: 0,
+      creditsLeft: live.reduce((n, k) => n + (k.events_total - k.events_used), 0),
+      nextExpiry: live[0]?.expires_at ?? null,
+    });
+    if (warning) {
+      const { maybeSendWarning } = await import("@/lib/klokk-notify.server");
+      // The period (the soonest expiry) lets the warning repeat after a new purchase.
+      await maybeSendWarning({ userId: c.id, warning, period: live[0]?.expires_at ?? "none" });
+    }
+  }
+
   // Subscriptions that were cancelled (or never renewed) and whose paid period has ended.
   await (db as any)
     .from("profiles")

@@ -5,7 +5,9 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/klokk/status-badge";
 import { Avatar } from "@/components/klokk/avatar";
-import { useCurrentAccount, useOwnedEvents, useSession } from "@/lib/klokk-hooks";
+import { useBilling, useCurrentAccount, useOwnedEvents, useSession } from "@/lib/klokk-hooks";
+import { LimitBanner } from "@/components/klokk/limit-banner";
+import { eventsWarning, participantWarning } from "@/lib/klokk-warnings";
 import { computeStatus } from "@/lib/klokk-store";
 import { formatDateShort, relativeDeadline, daysUntil } from "@/lib/klokk-format";
 import type { KlokkEvent } from "@/lib/klokk-types";
@@ -26,6 +28,7 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const session = useSession();
   const account = useCurrentAccount();
+  const billing = useBilling();
   const events = useOwnedEvents();
   const navigate = useNavigate();
 
@@ -53,6 +56,12 @@ function Dashboard() {
 
   const totalResponses = events.reduce((n, e) => n + e.responses.length, 0);
 
+  const eventsW = billing ? eventsWarning(billing) : null;
+  const eventW = active
+    .map((c) => participantWarning(account.plan, c.event.responses.length, c.event.title))
+    .find((w) => w !== null);
+  const bannerWarning = eventW ?? eventsW;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -78,6 +87,8 @@ function Dashboard() {
           </Button>
         </Link>
       </div>
+
+      {bannerWarning && <LimitBanner warning={bannerWarning} />}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <StatCard icon={<Clock className="size-4" />} label="Active events" value={active.length} />

@@ -31,7 +31,8 @@ import {
   useSendInvitations,
 } from "@/lib/klokk-hooks";
 import { computeStatus } from "@/lib/klokk-store";
-import { CASUAL_INCLUDED_PARTICIPANTS, casualOverage } from "@/lib/klokk-limits";
+import { participantWarning } from "@/lib/klokk-warnings";
+import { LimitBanner } from "@/components/klokk/limit-banner";
 import {
   confirmedTimeLabel,
   formatDate,
@@ -56,6 +57,7 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
   const status = computeStatus(event);
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/event/${event.token}`;
   const best = bestSlot(event);
+  const warning = participantWarning(account.plan, event.responses.length, event.title);
 
   const respondedEmails = useMemo(
     () => new Set(event.responses.map((r) => r.email.toLowerCase())),
@@ -259,16 +261,7 @@ export function EventManagement({ event, account }: { event: KlokkEvent; account
         </div>
       )}
 
-      {account.plan === "casual" && event.responses.length > CASUAL_INCLUDED_PARTICIPANTS && (
-        <p className="mt-6 rounded-xl border border-border bg-surface/60 p-3 text-sm text-foreground">
-          This event has {event.responses.length} participants, over the{" "}
-          {CASUAL_INCLUDED_PARTICIPANTS} included on Casual. Overage for this event:{" "}
-          <strong>${casualOverage(event.responses.length).amount.toFixed(2)}</strong> (
-          {casualOverage(event.responses.length).blocks} block
-          {casualOverage(event.responses.length).blocks === 1 ? "" : "s"} of 5). Organiser
-          ($17/month) has no overage up to 80 participants.
-        </p>
-      )}
+      {warning && <LimitBanner warning={warning} />}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <section>

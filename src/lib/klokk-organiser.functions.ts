@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { mapEvent, mapProfile } from "./klokk-mapping";
 import { makeToken } from "./klokk-store";
 import { participantCapForPlan } from "./klokk-limits";
+import { eventsWarning } from "./klokk-warnings";
 import {
   sendMeetingConfirmation,
   sendCancellation,
@@ -241,6 +242,27 @@ export const createMyEvent = createServerFn({ method: "POST" })
       .eq("id", eventId)
       .single();
 
+    // Email a heads-up when the free event allowance is nearly or fully used.
+    try {
+      const { data: after } = await (supabase as any)
+        .from("profiles")
+        .select("plan, events_created")
+        .eq("id", userId)
+        .maybeSingle();
+      const warning = eventsWarning({
+        plan: after?.plan ?? "free",
+        eventsCreated: after?.events_created ?? 0,
+        creditsLeft: 99,
+        nextExpiry: null,
+      });
+      if (warning && after?.plan === "free") {
+        const { maybeSendWarning } = await import("./klokk-notify.server");
+        await maybeSendWarning({ userId, warning, period: String(after.events_created) });
+      }
+    } catch {
+      /* warnings are best-effort */
+    }
+
     // F3: send invitation emails to named participants on creation.
     if (data.participationMode === "named" && data.namedParticipants.length > 0) {
       try {
@@ -350,6 +372,9 @@ export const updateMyEvent = createServerFn({ method: "POST" })
       const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
 
       if (data.status === "confirmed") {
+        // Casual organisers are invoiced for participants above the 35 included.
+        const { invoiceOverage } = await import("./klokk-notify.server");
+        await invoiceOverage(event.id);
         // Notify every participant who responded (and named participants who didn't).
         const recipients = new Map<string, { first: string; last: string }>();
         for (const r of event.responses) {

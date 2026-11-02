@@ -14,6 +14,8 @@ import {
 import { PaymentCheckoutBlock } from "@/integrations/payments";
 import { useBilling, useClaimOrder, useUpdateEmbedSettings } from "@/lib/klokk-hooks";
 import { FREE_LIFETIME_EVENTS } from "@/lib/klokk-limits";
+import { eventsWarning } from "@/lib/klokk-warnings";
+import { LimitBanner } from "@/components/klokk/limit-banner";
 import type { KlokkAccount } from "@/lib/klokk-types";
 
 function Card({
@@ -41,6 +43,57 @@ const PLAN_LABEL: Record<string, string> = {
   teams: "Teams",
 };
 
+const PLANS = [
+  {
+    id: "free",
+    name: "Free (Trial)",
+    price: "$0",
+    cta: "",
+    points: ["3 events in total", "Up to 35 participants per event", "1 organiser seat"],
+  },
+  {
+    id: "casual",
+    name: "Casual (Credit Packs)",
+    price: "$25 for 5 · $45 for 10 · $60 for 15 events",
+    cta: "Buy a credit pack",
+    points: [
+      "Credits expire 3 months after purchase",
+      "35 participants per event included",
+      "Extra participants: $6.20 per block of 5 (36–50), then $5.30, charged per event",
+    ],
+  },
+  {
+    id: "organiser",
+    name: "Organiser",
+    price: "$17 / month",
+    cta: "Choose Organiser",
+    points: [
+      "Unlimited events",
+      "Up to 80 participants per event",
+      "Annual: pay for 10 months, get 12",
+    ],
+  },
+  {
+    id: "teams",
+    name: "Teams",
+    price: "$35 / month + $8 / extra seat",
+    cta: "Choose Teams",
+    points: [
+      "3 organiser seats included",
+      "Unlimited events and participants",
+      "Annual: pay for 10 months, get 12",
+    ],
+  },
+] as const;
+
+function cancelMailto(plan: string): string {
+  const subject = encodeURIComponent("Klokk: change or cancel my plan");
+  const body = encodeURIComponent(
+    `Hi, please change or cancel my Klokk ${plan} plan at the end of my current billing period.\n\nMy account email: `,
+  );
+  return `mailto:info@platinumbusinessteams.com?subject=${subject}&body=${body}`;
+}
+
 export function BillingTab() {
   const billing = useBilling();
   const claim = useClaimOrder();
@@ -51,8 +104,7 @@ export function BillingTab() {
   }
 
   const freeLeft = Math.max(0, FREE_LIFETIME_EVENTS - billing.eventsCreated);
-  const soon =
-    billing.nextExpiry && new Date(billing.nextExpiry).getTime() - Date.now() < 7 * 86_400_000;
+  const warning = eventsWarning(billing);
 
   return (
     <div className="space-y-8">
@@ -106,22 +158,7 @@ export function BillingTab() {
           )}
         </dl>
 
-        {/* Non-intrusive upgrade prompts (never shown while creating an event). */}
-        {billing.plan === "free" && freeLeft === 0 && (
-          <p className="mt-4 rounded-lg border border-border bg-surface/60 p-3 text-sm text-foreground">
-            You've used all {FREE_LIFETIME_EVENTS} free events. A credit pack starts at $25 for 5
-            events, or Organiser is $17/month for unlimited events.
-          </p>
-        )}
-        {billing.plan === "casual" && (billing.creditsLeft === 0 || soon) && (
-          <p className="mt-4 rounded-lg border border-border bg-surface/60 p-3 text-sm text-foreground">
-            {billing.creditsLeft === 0
-              ? "You're out of event credits."
-              : "Your credit pack expires within 7 days."}{" "}
-            If you run more than a few events a month, Organiser ($17/month, unlimited events) costs
-            less than buying packs.
-          </p>
-        )}
+        {warning && <LimitBanner warning={warning} />}
 
         <div className="mt-5">
           <Button onClick={() => setOpen(true)} className="shadow-premium">
@@ -129,6 +166,68 @@ export function BillingTab() {
             {billing.plan === "free" ? "Buy a pack or subscribe" : "Change plan or buy a pack"}
           </Button>
         </div>
+      </Card>
+
+      <Card
+        title="Choose a plan"
+        subtitle="Prices are in Australian dollars. Annual billing on Organiser and Teams includes 2 months free."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          {PLANS.map((p) => {
+            const current = billing.plan === p.id;
+            return (
+              <div
+                key={p.id}
+                className={`flex flex-col rounded-xl border p-4 ${current ? "border-primary/60 bg-primary/5" : "border-border"}`}
+              >
+                <div className="flex items-baseline justify-between">
+                  <h3 className="font-display text-base font-semibold text-card-foreground">
+                    {p.name}
+                  </h3>
+                  {current && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      Current plan
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm font-medium text-card-foreground">{p.price}</p>
+                <ul className="mt-3 flex-1 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                  {p.points.map((pt) => (
+                    <li key={pt}>{pt}</li>
+                  ))}
+                </ul>
+                {p.id === "free" ? (
+                  billing.plan !== "free" && (
+                    <a
+                      href={cancelMailto(billing.plan)}
+                      className="mt-4 text-center text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Request a downgrade / cancellation
+                    </a>
+                  )
+                ) : (
+                  <Button
+                    variant={current ? "outline" : "default"}
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => setOpen(true)}
+                  >
+                    {current
+                      ? p.id === "casual"
+                        ? "Buy another pack"
+                        : "Manage / change billing period"
+                      : p.cta}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Checkout opens with all current prices. To switch between Organiser and Teams, or to
+          cancel, email us and we'll update your subscription (you keep access until the end of the
+          period you've paid for).
+        </p>
       </Card>
 
       {billing.packs.length > 0 && (

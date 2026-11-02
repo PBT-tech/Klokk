@@ -10,6 +10,7 @@ import { z } from "zod";
 import { mapEvent } from "./klokk-mapping";
 import { sendSubmissionConfirmation } from "./klokk-email";
 import { participantCapForPlan } from "./klokk-limits";
+import { participantWarning } from "./klokk-warnings";
 import type { KlokkEvent, ParticipantResponse } from "./klokk-types";
 
 const PUBLIC_EVENT_SELECT = `
@@ -215,6 +216,21 @@ export const submitResponse = createServerFn({ method: "POST" })
     if (error) throw error;
 
     await recordEmbedEvent(embedId, "submit");
+
+    // Warn the organiser (email, once per level) as the event nears or passes its limit.
+    try {
+      const { count: total } = await client
+        .from("participant_responses")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", event.id);
+      const warning = participantWarning(owner?.plan, total ?? 0, event.title);
+      if (warning) {
+        const { maybeSendWarning } = await import("./klokk-notify.server");
+        await maybeSendWarning({ userId: event.owner_id, eventId: event.id, warning });
+      }
+    } catch {
+      /* warnings are best-effort */
+    }
 
     // F4/F7: submission confirmation email (best-effort, never blocks).
     try {
