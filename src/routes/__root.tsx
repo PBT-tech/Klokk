@@ -80,8 +80,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   // Defaults for every page. The embed route overrides Content-Security-Policy so that
   // only the organiser's allowed sites can frame it.
-  headers: () => ({
-    "Content-Security-Policy": "frame-ancestors 'self'",
+  headers: ({ matches }) => ({
+    // The embed page sets its own policy (allowed sites only), so do not send ours there.
+    ...(matches.some((m) => (m.routeId as string) === "/embed/$token")
+      ? {}
+      : { "Content-Security-Policy": "frame-ancestors 'self'" }),
     "X-Content-Type-Options": "nosniff",
     // Event links carry a secret token in the address: never send it to other sites.
     "Referrer-Policy": "no-referrer",

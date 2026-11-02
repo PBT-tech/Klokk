@@ -140,7 +140,8 @@ export const getPublicEvent = createServerFn({ method: "GET" })
   .validator(z.object({ token: z.string().min(8).max(600) }))
   .handler(async ({ data }) => {
     const { eventToken, embedId } = await resolveToken(data.token);
-    await rateLimit(`view:${await clientIp()}`, 240, 60);
+    const viewIp = await clientIp();
+    if (viewIp !== "unknown") await rateLimit(`view:${viewIp}`, 240, 60);
     const client = await admin();
     const { data: row, error } = await client
       .from("events")
@@ -168,7 +169,8 @@ export const lookupMyResponse = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { eventToken } = await resolveToken(data.token);
-    await rateLimit(`lookup:${await clientIp()}`, 60, 60);
+    const lookupIp = await clientIp();
+    if (lookupIp !== "unknown") await rateLimit(`lookup:${lookupIp}`, 60, 60);
     const client = await admin();
     const { data: event } = await client
       .from("events")
@@ -209,7 +211,9 @@ export const submitResponse = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { eventToken, embedId } = await resolveToken(data.token);
     const ip = await clientIp();
-    await rateLimit(`submit:ip:${ip}`, 20, 600);
+    // If the host does not tell us the visitor's address, skip the per-address limit rather
+    // than putting every visitor in one shared bucket; the per-event limit still applies.
+    if (ip !== "unknown") await rateLimit(`submit:ip:${ip}`, 20, 600);
     await rateLimit(`submit:event:${eventToken}`, 300, 3600);
     const client = await admin();
     const email = data.email.trim().toLowerCase();
@@ -268,11 +272,15 @@ export const submitResponse = createServerFn({ method: "POST" })
     }
 
     // Only photos uploaded through our own server function are accepted as avatars.
-    const avatarPrefix = `${process.env["SUPABASE_URL"] ?? ""}/storage/v1/object/public/avatars/participants/`;
+    // Only photos uploaded through our own server function are accepted as avatars:
+    // <project>/storage/v1/object/public/avatars/participants/<uuid>/<uuid>.<ext>
+    const base = process.env["SUPABASE_URL"] ?? "";
+    const avatarPattern = new RegExp(
+      `^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/storage/v1/object/public/avatars/participants/` +
+        `[0-9a-f-]{36}/[0-9a-f-]{36}\\.(png|jpg|gif|webp)$`,
+    );
     const avatarUrl =
-      data.avatarUrl && process.env["SUPABASE_URL"] && data.avatarUrl.startsWith(avatarPrefix)
-        ? data.avatarUrl
-        : null;
+      base && data.avatarUrl && avatarPattern.test(data.avatarUrl) ? data.avatarUrl : null;
 
     const editToken =
       data.editToken ?? `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
@@ -373,7 +381,8 @@ export const uploadParticipantAvatarFn = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { eventToken } = await resolveToken(data.token);
-    await rateLimit(`avatar:ip:${await clientIp()}`, 10, 3600);
+    const avatarIp = await clientIp();
+    if (avatarIp !== "unknown") await rateLimit(`avatar:ip:${avatarIp}`, 10, 3600);
     await rateLimit(`avatar:event:${eventToken}`, 150, 3600);
     const client = await admin();
     const { data: event } = await client

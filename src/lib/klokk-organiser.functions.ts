@@ -155,7 +155,7 @@ const namedSchema = z.object({
   firstName: z.string().max(100),
   lastName: z.string().max(100),
   email: z.string().email().max(254),
-  avatarUrl: z.string().max(2000).optional(),
+  avatarUrl: z.string().max(2000).startsWith("https://").optional(),
 });
 
 export const createMyEvent = createServerFn({ method: "POST" })
