@@ -40,7 +40,8 @@ export function isCheckoutReturn(): boolean {
 
 type Fields = Record<string, unknown>;
 
-const isFields = (v: unknown): v is Fields => typeof v === "object" && v !== null && !Array.isArray(v);
+const isFields = (v: unknown): v is Fields =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const optNum = (o: Fields, key: string): Fields => (isNum(o[key]) ? { [key]: o[key] } : {});
 
@@ -62,7 +63,8 @@ function readLine(v: unknown): CheckoutOrderLine | null {
   const name = v["name"];
   const unitAmount = v["unitAmount"];
   const quantity = v["quantity"];
-  if (typeof productId !== "string" || typeof priceId !== "string" || typeof name !== "string") return null;
+  if (typeof productId !== "string" || typeof priceId !== "string" || typeof name !== "string")
+    return null;
   if (!isNum(unitAmount) || !isNum(quantity)) return null;
   const recurring = v["recurring"] === undefined ? undefined : readRecurring(v["recurring"]);
   if (recurring === null) return null;
@@ -86,13 +88,28 @@ function readTotals(v: unknown): CheckoutOrderTotals | null {
   if (!isNum(subtotal) || !isNum(totalDueToday) || !Array.isArray(rawTaxes)) return null;
   const taxes: CheckoutOrderTotals["taxes"] = [];
   for (const t of rawTaxes) {
-    if (!isFields(t) || typeof t["name"] !== "string" || !isNum(t["rate"]) || !isNum(t["amount"])) return null;
-    taxes.push({ name: t["name"], rate: t["rate"], amount: t["amount"], inclusive: t["inclusive"] === true });
+    if (!isFields(t) || typeof t["name"] !== "string" || !isNum(t["rate"]) || !isNum(t["amount"]))
+      return null;
+    taxes.push({
+      name: t["name"],
+      rate: t["rate"],
+      amount: t["amount"],
+      inclusive: t["inclusive"] === true,
+    });
   }
   const r = v["recurring"];
   const recurring =
-    isFields(r) && isNum(r["amount"]) && typeof r["interval"] === "string" && isNum(r["intervalCount"])
-      ? { recurring: { amount: r["amount"], interval: r["interval"], intervalCount: r["intervalCount"] } }
+    isFields(r) &&
+    isNum(r["amount"]) &&
+    typeof r["interval"] === "string" &&
+    isNum(r["intervalCount"])
+      ? {
+          recurring: {
+            amount: r["amount"],
+            interval: r["interval"],
+            intervalCount: r["intervalCount"],
+          },
+        }
       : {};
   const couponCode = v["couponCode"];
   return {
@@ -131,7 +148,8 @@ export function readCheckoutOrder(): CheckoutOrder | null {
   const currency = parsed["currency"];
   const amount = parsed["amount"];
   const rawLines = parsed["lines"];
-  if (typeof orderId !== "string" || !orderId || typeof currency !== "string" || !isNum(amount)) return null;
+  if (typeof orderId !== "string" || !orderId || typeof currency !== "string" || !isNum(amount))
+    return null;
   if (!Array.isArray(rawLines)) return null;
   const lines: CheckoutOrderLine[] = [];
   for (const raw of rawLines) {

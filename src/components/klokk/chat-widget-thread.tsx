@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, ChevronDown, Send, X, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";

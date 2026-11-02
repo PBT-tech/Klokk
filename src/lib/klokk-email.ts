@@ -6,8 +6,6 @@
 import type { KlokkEvent } from "./klokk-types";
 import { confirmedTimeLabel } from "./klokk-format";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const ENDPOINT = "https://backend.leadconnectorhq.com/external-tracking/events";
 const TRACKING_ID = "tk_9fa1b07fdc4a47ce8e0d2f1b7bdba934";
 const LOCATION_ID = "0FNYpxrhqqIS9bIV2FDq";

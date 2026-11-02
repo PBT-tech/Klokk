@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Chat widget integration config — HighLevel headless chat core.
 // The core owns backend calls, tokens, captcha, sockets, history and message
 // state; the site owns presentation. These values come from the connected

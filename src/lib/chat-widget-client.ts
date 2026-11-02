@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // One chat client per page session. The core owns backend calls, tokens,
 // captcha, sockets, history and message state; we cache the import + client.
 import { chatWidgetConfig, loadChatCore } from "./chat-widget-config";

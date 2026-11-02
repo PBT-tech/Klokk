@@ -99,7 +99,8 @@ export type CheckoutOrderBuyer = {
   name: string;
   email: string;
   phone?: string | undefined;
-  address?: { line1: string; city: string; state: string; zip: string; country: string } | undefined;
+  address?:
+    { line1: string; city: string; state: string; zip: string; country: string } | undefined;
 };
 
 type CheckoutSdk = {

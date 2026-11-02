@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, Loader2 } from "lucide-react";
 import { chatCopy } from "@/lib/chat-widget-copy";
@@ -42,7 +43,9 @@ export function ChatWidget() {
       try {
         unsub?.();
         clientRef.current?.close?.();
-      } catch {}
+      } catch {
+        /* widget teardown is best-effort */
+      }
     };
   }, []);
 
@@ -57,7 +60,9 @@ export function ChatWidget() {
       try {
         clientRef.current?.setPanelOpen?.(false);
         clientRef.current?.close?.();
-      } catch {}
+      } catch {
+        /* widget teardown is best-effort */
+      }
       return;
     }
     setOpen(true);

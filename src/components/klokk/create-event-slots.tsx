@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -118,7 +119,7 @@ export function SlotsStep({
 
         {mode === "range" ? (
           <div>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {}
             <Calendar
               mode="range"
               selected={dateRange as any}

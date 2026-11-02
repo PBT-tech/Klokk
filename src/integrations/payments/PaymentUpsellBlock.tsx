@@ -26,11 +26,7 @@ type PaymentUpsellBlockProps = {
  * product, its price, and the accept / decline buttons, and charges through
  * the hosted CDN script; the page around it supplies only headline copy.
  */
-export function PaymentUpsellBlock({
-  productId,
-  priceId,
-  nextPath,
-}: PaymentUpsellBlockProps) {
+export function PaymentUpsellBlock({ productId, priceId, nextPath }: PaymentUpsellBlockProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -50,9 +46,7 @@ export function PaymentUpsellBlock({
       })
       .catch((err: unknown) => {
         if (destroyed) return;
-        setLoadError(
-          err instanceof Error ? err.message : "Failed to load the offer.",
-        );
+        setLoadError(err instanceof Error ? err.message : "Failed to load the offer.");
       });
 
     return () => {
