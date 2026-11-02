@@ -154,7 +154,6 @@ function AccountTab({ account }: { account: ReturnType<typeof useCurrentAccount>
       toast.error(error.message);
       return;
     }
-    updateProfile.mutate({ email: email.trim() });
     toast.success("Email updated — check your inbox to confirm");
   };
 

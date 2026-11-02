@@ -71,13 +71,14 @@ export const claimOrder = createServerFn({ method: "POST" })
   .validator(z.object({ orderId: z.string().min(4).max(100) }))
   .handler(async ({ data, context }) => {
     const { fetchPaidOrder, applyOrder } = await import("./klokk-billing.server");
-    const { data: me } = await (context.supabase as any)
-      .from("profiles")
-      .select("email")
-      .eq("id", context.userId)
-      .maybeSingle();
+    // Identity is the confirmed email on the sign-in account, never an editable profile field.
+    const { data: auth } = await context.supabase.auth.getUser();
+    const authEmail = auth?.user?.email?.toLowerCase();
+    if (!authEmail || !auth.user?.email_confirmed_at) {
+      throw new Error("Please verify your email address before buying a plan.");
+    }
     const order = await fetchPaidOrder(data.orderId);
-    if (!me?.email || order.email !== String(me.email).toLowerCase()) {
+    if (order.email !== authEmail) {
       throw new Error("That order was placed with a different email address than your account.");
     }
     return applyOrder(context.userId, order);

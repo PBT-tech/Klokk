@@ -37,6 +37,13 @@ function mapChat(r: any): ChatMessage {
   };
 }
 
+const channelSchema = z.object({ email: z.boolean(), sms: z.boolean() });
+const notifPrefsSchema = z.object({
+  eventUpdates: channelSchema,
+  reminders: channelSchema,
+  chatMessages: channelSchema,
+});
+
 // ---------- profile ----------
 
 export const getMyProfile = createServerFn({ method: "GET" })
@@ -80,30 +87,24 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
-      email: z.string().optional(),
       firstName: z.string().optional(),
       lastName: z.string().optional(),
       avatarUrl: z.string().nullable().optional(),
-      smsCredits: z.number().optional(),
       smsAutoTopUp: z.boolean().optional(),
       smsLowBalanceThreshold: z.number().optional(),
-      notificationPrefs: z.any().optional(),
-      embedSettings: z.any().optional(),
+      notificationPrefs: notifPrefsSchema.optional(),
     }),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const patch: Record<string, unknown> = {};
-    if (data.email !== undefined) patch["email"] = data.email;
     if (data.firstName !== undefined) patch["first_name"] = data.firstName;
     if (data.lastName !== undefined) patch["last_name"] = data.lastName;
     if (data.avatarUrl !== undefined) patch["avatar_url"] = data.avatarUrl;
-    if (data.smsCredits !== undefined) patch["sms_credits"] = data.smsCredits;
     if (data.smsAutoTopUp !== undefined) patch["sms_auto_top_up"] = data.smsAutoTopUp;
     if (data.smsLowBalanceThreshold !== undefined)
       patch["sms_low_balance_threshold"] = data.smsLowBalanceThreshold;
     if (data.notificationPrefs !== undefined) patch["notification_prefs"] = data.notificationPrefs;
-    if (data.embedSettings !== undefined) patch["embed_settings"] = data.embedSettings;
     const { error } = await supabase
       .from("profiles")
       .update(patch as any)
@@ -144,31 +145,31 @@ export const getMyEvent = createServerFn({ method: "GET" })
   });
 
 const slotSchema = z.object({
-  id: z.string(),
-  date: z.string(),
-  startTime: z.string(),
-  endTime: z.string(),
+  id: z.string().max(64),
+  date: z.string().max(10),
+  startTime: z.string().max(5),
+  endTime: z.string().max(5),
 });
 const namedSchema = z.object({
-  id: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  email: z.string().email(),
-  avatarUrl: z.string().optional(),
+  id: z.string().max(64),
+  firstName: z.string().max(100),
+  lastName: z.string().max(100),
+  email: z.string().email().max(254),
+  avatarUrl: z.string().max(2000).optional(),
 });
 
 export const createMyEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
     z.object({
-      title: z.string().min(1),
-      description: z.string().optional(),
-      location: z.string().optional(),
+      title: z.string().min(1).max(200),
+      description: z.string().max(2000).optional(),
+      location: z.string().max(300).optional(),
       participationMode: z.enum(["minimum", "named"]),
-      minimumCount: z.number().optional(),
-      deadline: z.string(),
-      slots: z.array(slotSchema),
-      namedParticipants: z.array(namedSchema),
+      minimumCount: z.number().int().min(1).max(10000).optional(),
+      deadline: z.string().max(40),
+      slots: z.array(slotSchema).max(200),
+      namedParticipants: z.array(namedSchema).max(200),
     }),
   )
   .handler(async ({ data, context }) => {
@@ -276,7 +277,7 @@ export const createMyEvent = createServerFn({ method: "POST" })
           owner && (owner.first_name || owner.last_name)
             ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
             : "Your organiser";
-        const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
+        const origin = await (await import("./klokk-origin.server")).appOrigin();
         for (const p of mapped.namedParticipants) {
           sendInvitation({
             recipientEmail: p.email,
@@ -369,7 +370,7 @@ export const updateMyEvent = createServerFn({ method: "POST" })
         owner && (owner.first_name || owner.last_name)
           ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
           : "Your organiser";
-      const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
+      const origin = await (await import("./klokk-origin.server")).appOrigin();
 
       if (data.status === "confirmed") {
         // Casual organisers are invoiced for participants above the 35 included.
@@ -524,7 +525,7 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
 
 export const updateNotificationPrefs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(z.object({ prefs: z.any() }))
+  .validator(z.object({ prefs: notifPrefsSchema }))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase
@@ -585,7 +586,7 @@ export const sendInvitationsFn = createServerFn({ method: "POST" })
       owner && (owner.first_name || owner.last_name)
         ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
         : "Your organiser";
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
+    const origin = await (await import("./klokk-origin.server")).appOrigin();
     let sent = 0;
     for (const p of event.namedParticipants) {
       try {
@@ -637,7 +638,7 @@ export const sendReminderFn = createServerFn({ method: "POST" })
       owner && (owner.first_name || owner.last_name)
         ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
         : "Your organiser";
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://klokk.com";
+    const origin = await (await import("./klokk-origin.server")).appOrigin();
     let sent = 0;
     for (const p of outstanding) {
       try {
@@ -692,7 +693,7 @@ export const listEmbeds = createServerFn({ method: "GET" })
       out.push({
         id: r.id,
         eventId: r.event_id,
-        token: await signEmbed({ e: r.events.token, i: r.id }),
+        token: await signEmbed({ i: r.id }),
         createdAt: r.created_at,
         expiresAt: r.expires_at,
         revokedAt: r.revoked_at,
@@ -733,7 +734,7 @@ export const createEmbed = createServerFn({ method: "POST" })
       .single();
     if (error) throw error;
     const { signEmbed } = await import("./klokk-embed.server");
-    return { id: row.id as string, token: await signEmbed({ e: ev.token, i: row.id }) };
+    return { id: row.id as string, token: await signEmbed({ i: row.id }) };
   });
 
 export const revokeEmbed = createServerFn({ method: "POST" })

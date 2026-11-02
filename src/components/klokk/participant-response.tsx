@@ -17,6 +17,7 @@ import {
   toSlotLabel,
 } from "@/lib/klokk-format";
 import { uploadParticipantAvatar } from "@/lib/klokk-avatars";
+import { getEditToken, setEditToken } from "@/lib/klokk-edit-token";
 import { buildTrackingPayload, postTrackingEvent } from "@/lib/klokk-tracking";
 
 /**
@@ -131,8 +132,9 @@ export function ParticipantResponseView({ token }: { token: string }) {
       return;
     }
     try {
-      await submitResponse.mutateAsync({
+      const result = await submitResponse.mutateAsync({
         token,
+        editToken: getEditToken(token, email),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -142,6 +144,7 @@ export function ParticipantResponseView({ token }: { token: string }) {
         notes: notes.trim() || undefined,
       });
       setSubmitted(true);
+      if (result?.editToken) setEditToken(token, email, result.editToken);
       try {
         sessionStorage.setItem(
           `klokk-last-${token}`,

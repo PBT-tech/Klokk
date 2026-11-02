@@ -4,7 +4,6 @@
 // the signed-in user's email.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { CASUAL_PACK_VALID_MONTHS } from "./klokk-limits";
 
 export type PriceGrant =
   | { kind: "pack"; events: number }
@@ -89,63 +88,26 @@ export async function fetchPaidOrder(orderId: string): Promise<VerifiedOrder> {
   return { orderId, email, lines };
 }
 
-function addMonths(d: Date, m: number): Date {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + m);
-  return x;
-}
-
-/** Grant what a verified, paid order bought. Idempotent per order id. */
+/** Grant what a verified, paid order bought, in one database transaction. Idempotent per order id. */
 export async function applyOrder(userId: string, order: VerifiedOrder) {
   const db = await admin();
   const map = priceMap();
-  const grants = order.lines
-    .map((l) => ({ line: l, grant: map[l.priceId] }))
-    .filter((g): g is { line: (typeof order.lines)[number]; grant: PriceGrant } => !!g.grant);
+  // Merge repeat lines for the same price so quantities add up.
+  const byPrice = new Map<string, number>();
+  for (const l of order.lines) byPrice.set(l.priceId, (byPrice.get(l.priceId) ?? 0) + l.quantity);
+  const grants: Record<string, unknown>[] = [];
+  for (const [priceId, qty] of byPrice) {
+    const g = map[priceId];
+    if (g) grants.push({ ...g, priceId, qty });
+  }
   if (grants.length === 0)
     throw new Error("That order does not contain a Klokk plan or credit pack.");
 
-  // Record the order first; the primary key makes a repeat claim a no-op.
-  const { error: dupErr } = await db
-    .from("billing_orders")
-    .insert({ order_id: order.orderId, user_id: userId, summary: { lines: order.lines } });
-  if (dupErr) {
-    if (String(dupErr.code) === "23505") return { alreadyApplied: true };
-    throw dupErr;
-  }
-
-  const now = new Date();
-  for (const { line, grant } of grants) {
-    if (grant.kind === "pack") {
-      const { error } = await db.from("event_credit_packs").insert({
-        user_id: userId,
-        order_id: `${order.orderId}:${line.priceId}`,
-        events_total: grant.events * line.quantity,
-        purchased_at: now.toISOString(),
-        expires_at: addMonths(now, CASUAL_PACK_VALID_MONTHS).toISOString(),
-      });
-      if (error) throw error;
-      // A pack moves a Free account to Casual; it never downgrades a subscriber.
-      await db.from("profiles").update({ plan: "casual" }).eq("id", userId).eq("plan", "free");
-    } else if (grant.kind === "subscription") {
-      const renews = grant.interval === "year" ? addMonths(now, 12) : addMonths(now, 1);
-      const { error } = await db
-        .from("profiles")
-        .update({
-          plan: grant.plan,
-          billing_interval: grant.interval,
-          plan_renews_at: renews.toISOString(),
-          billing_status: "active",
-        })
-        .eq("id", userId);
-      if (error) throw error;
-    } else if (grant.kind === "seat") {
-      const { data: p } = await db.from("profiles").select("extra_seats").eq("id", userId).single();
-      await db
-        .from("profiles")
-        .update({ extra_seats: (p?.extra_seats ?? 0) + line.quantity })
-        .eq("id", userId);
-    }
-  }
-  return { alreadyApplied: false };
+  const { data, error } = await db.rpc("apply_billing_order", {
+    p_user: userId,
+    p_order: order.orderId,
+    p_grants: grants,
+  });
+  if (error) throw error;
+  return { alreadyApplied: data === false };
 }

@@ -7,17 +7,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute } from "@tanstack/react-router";
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+/** Constant-time comparison of SHA-256 digests, so neither content nor length leaks. */
+async function safeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [da, db] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const x = new Uint8Array(da);
+  const y = new Uint8Array(db);
   let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < x.length; i++) diff |= x[i]! ^ y[i]!;
   return diff === 0;
 }
 
 async function handle(request: Request): Promise<Response> {
   const secret = process.env["PAYMENT_WEBHOOK_SECRET"];
   const given = request.headers.get("x-klokk-secret") ?? "";
-  if (!secret || secret.length < 16 || !safeEqual(given, secret)) {
+  if (!secret || secret.length < 32 || !(await safeEqual(given, secret))) {
     return new Response("Unauthorized", { status: 401 });
   }
   let body: any;
@@ -38,6 +45,7 @@ async function handle(request: Request): Promise<Response> {
     .from("profiles")
     .select("id, billing_interval")
     .eq("email", email)
+    .eq("email_verified", true)
     .maybeSingle();
   if (!profile) return Response.json({ ok: true, ignored: "no matching account" });
 

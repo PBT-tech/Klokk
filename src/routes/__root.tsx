@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -77,6 +78,16 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Defaults for every page. The embed route overrides Content-Security-Policy so that
+  // only the organiser's allowed sites can frame it.
+  headers: () => ({
+    "Content-Security-Policy": "frame-ancestors 'self'",
+    "X-Content-Type-Options": "nosniff",
+    // Event links carry a secret token in the address: never send it to other sites.
+    "Referrer-Policy": "no-referrer",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  }),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -143,6 +154,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEnsureSeeded();
+  const pathname = useRouterState({ select: (st) => st.location.pathname });
+  // No third-party chat widget on pages that carry secret tokens or run inside an embed.
+  const showChat = !pathname.startsWith("/event/") && !pathname.startsWith("/embed/");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -154,7 +168,7 @@ function RootComponent() {
         <SiteFooter />
       </div>
       <Toaster position="bottom-right" richColors />
-      <ChatWidget />
+      {showChat && <ChatWidget />}
     </QueryClientProvider>
   );
 }

@@ -95,7 +95,7 @@ export async function maybeSendWarning(opts: {
       .eq("id", opts.userId)
       .maybeSingle();
     if (!p?.email) return false;
-    const origin = process.env["APP_ORIGIN"] ?? "https://klokk.com";
+    const origin = await (await import("./klokk-origin.server")).appOrigin();
     await sendOrganiserEmail({
       to: p.email,
       firstName: p.first_name ?? "",
@@ -120,39 +120,64 @@ export async function maybeSendWarning(opts: {
 }
 
 /**
- * Invoice a Casual organiser for participants above the 35 included. Runs once per
- * event when the event is confirmed. Disabled unless OVERAGE_INVOICING=on, and sends
- * a DRAFT (not sent to the customer) unless OVERAGE_INVOICING_LIVE=on.
+ * Remember that a Casual event has gone over the 35 included participants. The record
+ * lives in its own table (not tied to the event row), so deleting the event, or changing
+ * its status directly in the database, cannot make the charge disappear.
+ */
+export async function recordOveragePending(opts: {
+  eventId: string;
+  userId: string;
+  title: string;
+  participants: number;
+}): Promise<void> {
+  const { blocks, amount } = casualOverage(opts.participants);
+  if (blocks === 0) return;
+  const db = await admin();
+  const { data: existing } = await db
+    .from("overage_invoices")
+    .select("status")
+    .eq("event_id", opts.eventId)
+    .maybeSingle();
+  if (!existing) {
+    await db.from("overage_invoices").insert({
+      event_id: opts.eventId,
+      user_id: opts.userId,
+      title: opts.title,
+      participants: opts.participants,
+      blocks,
+      amount,
+    });
+  } else if (existing.status === "pending") {
+    await db
+      .from("overage_invoices")
+      .update({ participants: opts.participants, blocks, amount, title: opts.title })
+      .eq("event_id", opts.eventId);
+  }
+}
+
+/**
+ * Invoice one pending overage record. Disabled unless OVERAGE_INVOICING=on, and it
+ * creates a DRAFT (not sent to the customer) unless OVERAGE_INVOICING_LIVE=on.
  */
 export async function invoiceOverage(eventId: string): Promise<void> {
   if (process.env["OVERAGE_INVOICING"] !== "on") return;
   const db = await admin();
-  const { data: ev } = await db
-    .from("events")
-    .select("id, title, owner_id, participant_responses ( id )")
-    .eq("id", eventId)
+  // Claim the record first so two runs can never invoice the same event twice.
+  const { data: claimed } = await db
+    .from("overage_invoices")
+    .update({ status: "sending" })
+    .eq("event_id", eventId)
+    .eq("status", "pending")
+    .select("event_id, user_id, title, participants, blocks, amount")
     .maybeSingle();
-  if (!ev) return;
+  if (!claimed) return;
   const { data: owner } = await db
     .from("profiles")
-    .select("plan, email, first_name, last_name")
-    .eq("id", ev.owner_id)
+    .select("email, first_name, last_name")
+    .eq("id", claimed.user_id)
     .maybeSingle();
-  if (!owner || owner.plan !== "casual") return;
-  const participants = (ev.participant_responses ?? []).length;
-  const { blocks, amount } = casualOverage(participants);
-  if (blocks === 0) return;
-
-  const { error: dup } = await db.from("overage_invoices").insert({
-    event_id: ev.id,
-    user_id: ev.owner_id,
-    participants,
-    blocks,
-    amount,
-  });
-  if (dup) return; // already invoiced
-
   try {
+    if (!owner?.email) throw new Error("organiser has no email");
     const live = process.env["OVERAGE_INVOICING_LIVE"] === "on";
     const contactId = await upsertContact(
       owner.email,
@@ -167,14 +192,14 @@ export async function invoiceOverage(eventId: string): Promise<void> {
       body: JSON.stringify({
         altId: LOCATION_ID(),
         altType: "location",
-        name: `Klokk participant overage - ${ev.title}`,
+        name: `Klokk participant overage - ${claimed.title}`,
         currency: "AUD",
         items: [
           {
-            name: `Extra participants: ${ev.title}`,
-            description: `${participants} participants; 35 included; ${blocks} block(s) of 5 over`,
+            name: `Extra participants: ${claimed.title}`,
+            description: `${claimed.participants} participants; 35 included; ${claimed.blocks} block(s) of 5 over`,
             currency: "AUD",
-            amount,
+            amount: Number(claimed.amount),
             qty: 1,
             type: "one_time",
           },
@@ -199,12 +224,39 @@ export async function invoiceOverage(eventId: string): Promise<void> {
     await db
       .from("overage_invoices")
       .update({ status: live ? "sent" : "skipped", hl_invoice_id: j.invoice?._id ?? null })
-      .eq("event_id", ev.id);
+      .eq("event_id", eventId);
   } catch (e) {
     await db
       .from("overage_invoices")
       .update({ status: "failed", error: String(e).slice(0, 300) })
-      .eq("event_id", ev.id);
+      .eq("event_id", eventId);
     console.error("[klokk] overage invoice failed:", e);
   }
+}
+
+/** Safety net run by the scheduler: invoice every pending record whose event has finished. */
+export async function invoicePendingOverages(): Promise<number> {
+  if (process.env["OVERAGE_INVOICING"] !== "on") return 0;
+  const db = await admin();
+  const { data: pending } = await db
+    .from("overage_invoices")
+    .select("event_id")
+    .eq("status", "pending");
+  let n = 0;
+  for (const row of (pending ?? []) as { event_id: string }[]) {
+    const { data: ev } = await db
+      .from("events")
+      .select("status, deadline")
+      .eq("id", row.event_id)
+      .maybeSingle();
+    const finished =
+      !ev || // event was deleted
+      ["confirmed", "closed", "cancelled", "expired"].includes(ev.status) ||
+      new Date(ev.deadline).getTime() < Date.now() - 86_400_000;
+    if (finished) {
+      await invoiceOverage(row.event_id);
+      n++;
+    }
+  }
+  return n;
 }

@@ -12,22 +12,29 @@ import { mapEvent } from "@/lib/klokk-mapping";
 import { sendReminder } from "@/lib/klokk-email";
 import { eventsWarning } from "@/lib/klokk-warnings";
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+/** Constant-time comparison of SHA-256 digests, so neither content nor length leaks. */
+async function safeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [da, db] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const x = new Uint8Array(da);
+  const y = new Uint8Array(db);
   let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < x.length; i++) diff |= x[i]! ^ y[i]!;
   return diff === 0;
 }
 
 async function run(request: Request): Promise<Response> {
   const secret = process.env["CRON_SECRET"];
   const given = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!secret || secret.length < 16 || !safeEqual(given, secret)) {
+  if (!secret || secret.length < 32 || !(await safeEqual(given, secret))) {
     return new Response("Unauthorized", { status: 401 });
   }
 
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-  const origin = process.env["APP_ORIGIN"] ?? "https://klokk.com";
+  const origin = await (await import("@/lib/klokk-origin.server")).appOrigin();
   const summary = { reminded: 0, expired: 0, purged: 0 };
 
   // 2. Automatic reminders: deadline within the next 24 hours, not reminded yet.
@@ -78,6 +85,10 @@ async function run(request: Request): Promise<Response> {
   // 1 & 3. Expiry and retention purge.
   const { data: expired } = await (db as any).rpc("expire_overdue_events");
   const { data: purged } = await (db as any).rpc("purge_expired_events");
+  // Safety net: invoice overage records whose events have finished (or were deleted).
+  await (await import("@/lib/klokk-notify.server")).invoicePendingOverages();
+  await (db as any).rpc("purge_rate_limits");
+
   // Casual organisers: credits running low or a pack about to expire.
   const { data: casuals } = await (db as any).from("profiles").select("id").eq("plan", "casual");
   for (const c of (casuals ?? []) as { id: string }[]) {

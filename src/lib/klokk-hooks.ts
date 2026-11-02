@@ -26,6 +26,7 @@ import {
   sendReminderFn,
   sendInvitationsFn,
 } from "./klokk-organiser.functions";
+import { getEditToken } from "./klokk-edit-token";
 import { claimOrder, getMyBilling } from "./klokk-billing.functions";
 import { getPublicEvent, lookupMyResponse, submitResponse } from "./klokk-public.functions";
 import type { KlokkAccount, KlokkEvent } from "./klokk-types";
@@ -92,10 +93,11 @@ export function useEventByToken(token: string | undefined): KlokkEvent | undefin
 export function useMyResponse(token: string | undefined, email: string) {
   const fn = useServerFn(lookupMyResponse);
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const editToken = token && valid ? getEditToken(token, email) : undefined;
   const { data } = useQuery({
-    queryKey: ["klokk-my-response", token, email.trim().toLowerCase()],
-    queryFn: () => fn({ data: { token: token!, email: email.trim() } }),
-    enabled: !!token && valid,
+    queryKey: ["klokk-my-response", token, email.trim().toLowerCase(), !!editToken],
+    queryFn: () => fn({ data: { token: token!, email: email.trim(), editToken: editToken! } }),
+    enabled: !!token && valid && !!editToken,
     staleTime: 30_000,
   });
   return data ?? undefined;

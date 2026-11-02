@@ -13,8 +13,11 @@ import { participantCapForPlan } from "./klokk-limits";
 import { participantWarning } from "./klokk-warnings";
 import type { KlokkEvent, ParticipantResponse } from "./klokk-types";
 
+// Explicit columns only: never owner_id, billing or internal fields.
 const PUBLIC_EVENT_SELECT = `
-  *,
+  id, token, title, description, location, participation_mode, minimum_count, deadline, status,
+  confirmed_slot_id, confirmed_custom_date, confirmed_custom_start, confirmed_custom_end,
+  confirmed_at, created_at, closed_at,
   time_slots ( id, date, start_time, end_time ),
   named_participants ( id, first_name, last_name, avatar_url ),
   participant_responses ( id, slot_ids, submitted_at )
@@ -27,6 +30,47 @@ async function admin(): Promise<any> {
   return supabaseAdmin;
 }
 
+async function clientIp(): Promise<string> {
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const h = getRequest().headers;
+    return (
+      h.get("cf-connecting-ip") ??
+      h.get("x-real-ip") ??
+      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      "unknown"
+    );
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Persistent rate limit (database counter). Throws when the limit is exceeded. If the
+ * limiter itself is unavailable it allows the request rather than taking the site down.
+ */
+async function rateLimit(key: string, max: number, windowSeconds: number): Promise<void> {
+  try {
+    const client = await admin();
+    const { data, error } = await client.rpc("check_rate_limit", {
+      p_key: key,
+      p_max: max,
+      p_window_seconds: windowSeconds,
+    });
+    if (!error && data === false) {
+      throw new Error("Too many requests. Please wait a few minutes and try again.");
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Too many requests")) throw e;
+    console.error("[klokk] rate limiter unavailable:", e);
+  }
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 interface ResolvedToken {
   eventToken: string;
   embedId: string | null;
@@ -34,15 +78,15 @@ interface ResolvedToken {
 
 /**
  * A participant presents either the event's secret link token, or an embed token
- * ("emb." prefix). Embed tokens are verified (signature, not revoked, not expired,
- * not rate limited) and mapped back to the event token they grant.
+ * ("emb." prefix). An embed token only names an embed row; that row (not the token)
+ * decides which event it grants, and it can be revoked or expire at any time.
  */
 async function resolveToken(raw: string): Promise<ResolvedToken> {
   if (!raw.startsWith("emb.")) return { eventToken: raw, embedId: null };
-  const { verifyEmbed, embedRateLimited } = await import("./klokk-embed.server");
+  const { verifyEmbed } = await import("./klokk-embed.server");
   const payload = await verifyEmbed(raw);
   if (!payload) throw new Error("This embed link is not valid");
-  if (embedRateLimited(payload.i)) throw new Error("Too many requests. Please try again shortly.");
+  await rateLimit(`embed:${payload.i}`, 200, 60);
   const client = await admin();
   const { data: row } = await client
     .from("embed_tokens")
@@ -58,11 +102,11 @@ async function resolveToken(raw: string): Promise<ResolvedToken> {
     !r ||
     r.revoked_at ||
     (r.expires_at && new Date(r.expires_at).getTime() < Date.now()) ||
-    r.events?.token !== payload.e
+    !r.events?.token
   ) {
     throw new Error("This embed link is no longer active");
   }
-  return { eventToken: payload.e, embedId: payload.i };
+  return { eventToken: r.events.token, embedId: payload.i };
 }
 
 async function recordEmbedEvent(embedId: string | null, kind: "view" | "interaction" | "submit") {
@@ -72,10 +116,12 @@ async function recordEmbedEvent(embedId: string | null, kind: "view" | "interact
 }
 
 /** Strip anything a participant must not see about other people. */
-function toPublicEvent(row: any): KlokkEvent {
-  const event = mapEvent({ ...row, chat_messages: [] });
+function toPublicEvent(row: any, embedded: boolean): KlokkEvent {
+  const event = mapEvent({ ...row, owner_id: "", chat_messages: [] });
   return {
     ...event,
+    // Embed viewers must never learn the event's secret link token.
+    token: embedded ? "" : event.token,
     // Named participants: names only, never emails.
     namedParticipants: event.namedParticipants.map((p) => ({ ...p, email: "" })),
     // Responses: slot selections only (used for the availability counts).
@@ -94,6 +140,7 @@ export const getPublicEvent = createServerFn({ method: "GET" })
   .validator(z.object({ token: z.string().min(8).max(600) }))
   .handler(async ({ data }) => {
     const { eventToken, embedId } = await resolveToken(data.token);
+    await rateLimit(`view:${await clientIp()}`, 240, 60);
     const client = await admin();
     const { data: row, error } = await client
       .from("events")
@@ -103,19 +150,25 @@ export const getPublicEvent = createServerFn({ method: "GET" })
     if (error) throw error;
     if (!row) return null;
     await recordEmbedEvent(embedId, "view");
-    return toPublicEvent(row);
+    return toPublicEvent(row, embedId !== null);
   });
 
 /**
- * F4: a participant who re-opens the link with the same email sees which times
- * they chose before. Exact (lowercased) match only, and only slot selections are
- * returned — never names, notes or avatars — so knowing someone's email does not
- * reveal anything beyond which slots were ticked.
+ * F4: a participant who re-opens the link on the device they used before sees which
+ * times they chose. The browser presents the private edit code it was given when it
+ * first submitted; knowing someone's email address is not enough.
  */
 export const lookupMyResponse = createServerFn({ method: "POST" })
-  .validator(z.object({ token: z.string().min(8).max(600), email: z.string().email().max(254) }))
+  .validator(
+    z.object({
+      token: z.string().min(8).max(600),
+      email: z.string().email().max(254),
+      editToken: z.string().min(20).max(100),
+    }),
+  )
   .handler(async ({ data }) => {
     const { eventToken } = await resolveToken(data.token);
+    await rateLimit(`lookup:${await clientIp()}`, 60, 60);
     const client = await admin();
     const { data: event } = await client
       .from("events")
@@ -125,11 +178,12 @@ export const lookupMyResponse = createServerFn({ method: "POST" })
     if (!event) return null;
     const { data: row } = await client
       .from("participant_responses")
-      .select("slot_ids")
+      .select("slot_ids, edit_token_hash")
       .eq("event_id", event.id)
       .eq("email", data.email.trim().toLowerCase())
       .maybeSingle();
-    if (!row) return null;
+    if (!row || !row.edit_token_hash) return null;
+    if (row.edit_token_hash !== (await sha256Hex(data.editToken))) return null;
     return { slotIds: (row.slot_ids ?? []) as string[] };
   });
 
@@ -148,10 +202,15 @@ export const submitResponse = createServerFn({ method: "POST" })
       slotIds: z.array(z.string()).min(1).max(500),
       notes: z.string().max(1000).optional(),
       avatarUrl: z.string().max(2000).optional(),
+      /** private code from this browser's earlier submission, needed to change a response */
+      editToken: z.string().min(20).max(100).optional(),
     }),
   )
   .handler(async ({ data }) => {
     const { eventToken, embedId } = await resolveToken(data.token);
+    const ip = await clientIp();
+    await rateLimit(`submit:ip:${ip}`, 20, 600);
+    await rateLimit(`submit:event:${eventToken}`, 300, 3600);
     const client = await admin();
     const email = data.email.trim().toLowerCase();
 
@@ -185,10 +244,19 @@ export const submitResponse = createServerFn({ method: "POST" })
     const cap = participantCapForPlan(owner?.plan);
     const { data: existing } = await client
       .from("participant_responses")
-      .select("id")
+      .select("id, edit_token_hash")
       .eq("event_id", event.id)
       .eq("email", email)
       .maybeSingle();
+    // Changing an existing response needs the private code issued to the original browser.
+    if (existing?.edit_token_hash) {
+      const ok = data.editToken && (await sha256Hex(data.editToken)) === existing.edit_token_hash;
+      if (!ok) {
+        throw new Error(
+          "This email has already responded. Open the link on the device you used before, or ask the organiser to update your response.",
+        );
+      }
+    }
     if (cap !== null && !existing) {
       const { count } = await client
         .from("participant_responses")
@@ -199,16 +267,26 @@ export const submitResponse = createServerFn({ method: "POST" })
       }
     }
 
+    // Only photos uploaded through our own server function are accepted as avatars.
+    const avatarPrefix = `${process.env["SUPABASE_URL"] ?? ""}/storage/v1/object/public/avatars/participants/`;
+    const avatarUrl =
+      data.avatarUrl && process.env["SUPABASE_URL"] && data.avatarUrl.startsWith(avatarPrefix)
+        ? data.avatarUrl
+        : null;
+
+    const editToken =
+      data.editToken ?? `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
     const { error } = await client.from("participant_responses").upsert(
       {
         event_id: event.id,
+        edit_token_hash: await sha256Hex(editToken),
         first_name: data.firstName.trim(),
         last_name: data.lastName.trim(),
         email,
         phone: data.phone || null,
         slot_ids: slotIds,
         notes: data.notes?.trim() || null,
-        avatar_url: data.avatarUrl ?? null,
+        avatar_url: avatarUrl,
         submitted_at: new Date().toISOString(),
       },
       { onConflict: "event_id,email" },
@@ -223,6 +301,15 @@ export const submitResponse = createServerFn({ method: "POST" })
         .from("participant_responses")
         .select("id", { count: "exact", head: true })
         .eq("event_id", event.id);
+      if (owner?.plan === "casual") {
+        const { recordOveragePending } = await import("./klokk-notify.server");
+        await recordOveragePending({
+          eventId: event.id,
+          userId: event.owner_id,
+          title: event.title,
+          participants: total ?? 0,
+        });
+      }
       const warning = participantWarning(owner?.plan, total ?? 0, event.title);
       if (warning) {
         const { maybeSendWarning } = await import("./klokk-notify.server");
@@ -232,33 +319,35 @@ export const submitResponse = createServerFn({ method: "POST" })
       /* warnings are best-effort */
     }
 
-    // F4/F7: submission confirmation email (best-effort, never blocks).
-    try {
-      const organiserName =
-        owner && (owner.first_name || owner.last_name)
-          ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
-          : "Your organiser";
-      const fullEvent: KlokkEvent = mapEvent({
-        ...event,
-        time_slots: [],
-        named_participants: [],
-        participant_responses: [],
-        chat_messages: [],
-        created_at: "",
-      });
-      sendSubmissionConfirmation({
-        recipientEmail: email,
-        recipientFirstName: data.firstName,
-        recipientLastName: data.lastName,
-        event: fullEvent,
-        organiserName,
-        origin: process.env["APP_ORIGIN"] ?? "https://klokk.com",
-      });
-    } catch {
-      /* email is best-effort — never block submission */
-    }
+    // F4/F7: submission confirmation email, sent once per participant per event
+    // (best-effort, never blocks). Edits do not re-send it.
+    if (!existing)
+      try {
+        const organiserName =
+          owner && (owner.first_name || owner.last_name)
+            ? `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim()
+            : "Your organiser";
+        const fullEvent: KlokkEvent = mapEvent({
+          ...event,
+          time_slots: [],
+          named_participants: [],
+          participant_responses: [],
+          chat_messages: [],
+          created_at: "",
+        });
+        sendSubmissionConfirmation({
+          recipientEmail: email,
+          recipientFirstName: data.firstName,
+          recipientLastName: data.lastName,
+          event: fullEvent,
+          organiserName,
+          origin: await (await import("./klokk-origin.server")).appOrigin(),
+        });
+      } catch {
+        /* email is best-effort — never block submission */
+      }
 
-    return { ok: true };
+    return { ok: true, editToken };
   });
 
 const AVATAR_TYPES: Record<string, { ext: string; magic: number[][] }> = {
@@ -284,6 +373,8 @@ export const uploadParticipantAvatarFn = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { eventToken } = await resolveToken(data.token);
+    await rateLimit(`avatar:ip:${await clientIp()}`, 10, 3600);
+    await rateLimit(`avatar:event:${eventToken}`, 150, 3600);
     const client = await admin();
     const { data: event } = await client
       .from("events")
@@ -301,6 +392,13 @@ export const uploadParticipantAvatarFn = createServerFn({ method: "POST" })
       throw new Error("Image must be 2 MB or smaller");
     }
     if (!type.magic.some((m) => m.every((b, i) => bytes[i] === b))) {
+      throw new Error("That file does not look like a valid image");
+    }
+    // WebP is a RIFF container: also require the "WEBP" form type (not WAV/AVI).
+    if (
+      data.contentType === "image/webp" &&
+      new TextDecoder().decode(bytes.slice(8, 12)) !== "WEBP"
+    ) {
       throw new Error("That file does not look like a valid image");
     }
     const path = `participants/${event.id}/${crypto.randomUUID()}.${type.ext}`;

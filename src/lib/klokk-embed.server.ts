@@ -5,9 +5,8 @@
 // can be revoked immediately or expire without touching the host page.
 
 export interface EmbedPayload {
-  /** event token the embed grants access to */
-  e: string;
-  /** embed_tokens row id */
+  /** embed_tokens row id. The event is looked up from this row on every request, so the
+   *  event's secret link token is never placed inside (or revealed by) an embed token. */
   i: string;
 }
 
@@ -60,22 +59,9 @@ export async function verifyEmbed(token: string): Promise<EmbedPayload | null> {
     const ok = await crypto.subtle.verify("HMAC", await key(), fromB64Url(sig), enc.encode(body));
     if (!ok) return null;
     const payload = JSON.parse(new TextDecoder().decode(fromB64Url(body))) as EmbedPayload;
-    if (typeof payload.e !== "string" || typeof payload.i !== "string") return null;
+    if (typeof payload.i !== "string") return null;
     return payload;
   } catch {
     return null;
   }
-}
-
-// ---- best-effort rate limit: 200 requests / minute / embed (per server instance) ----
-const hits = new Map<string, { n: number; start: number }>();
-export function embedRateLimited(embedId: string): boolean {
-  const now = Date.now();
-  const cur = hits.get(embedId);
-  if (!cur || now - cur.start > 60_000) {
-    hits.set(embedId, { n: 1, start: now });
-    return false;
-  }
-  cur.n++;
-  return cur.n > 200;
 }
